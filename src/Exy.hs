@@ -6,20 +6,23 @@ import Prelude hiding (until)
 
 data Output = Continue | Quit deriving (Eq)
 
+type ExyState = [ String ]
+
 run :: IO ()
-run = run' 0
+run = run' []
   where
     run' st = do
       (out, st') <- runStateT step st
       if out == Quit then pure () else run' st'
 
-step :: StateT Int IO Output
+step :: StateT ExyState IO Output
 step = do
   liftIO $ putStrLn "Type something..."
   x <- liftIO getLine
   y <- get
+  put $ x : y
+  y <- get
   liftIO $ print y
-  put $ y + 1
   case x of
     "quit" -> pure Quit
     _ -> pure Continue
