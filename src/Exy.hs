@@ -4,20 +4,22 @@ import Control.Monad.State.Lazy
 import System.IO
 import Prelude hiding (until)
 
-data Output = Continue | Quite
+data Output = Continue | Quit deriving (Eq)
 
 run :: IO ()
 run = run' 0
   where
     run' st = do
       (out, st') <- runStateT step st
-      if out == "quit" then pure () else run' st'
+      if out == Quit then pure () else run' st'
 
-step :: StateT Int IO String
+step :: StateT Int IO Output
 step = do
   liftIO $ putStrLn "Type something..."
   x <- liftIO getLine
   y <- get
   liftIO $ print y
   put $ y + 1
-  pure x
+  case x of
+    "quit" -> pure Quit
+    _ -> pure Continue
