@@ -25,6 +25,7 @@ library:
   source-dirs: src
   dependencies:
     - mtl
+    - parsec
 
 executables:
   exy-exe:
