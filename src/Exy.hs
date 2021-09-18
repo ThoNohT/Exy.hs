@@ -4,28 +4,20 @@ import Control.Monad.State.Lazy
 import System.IO
 import Prelude hiding (until)
 
--- Type alias for a function that can parse a value of type a.
--- Returns either an error string, or the parsed value combined with the remaining string.
-type Parser a = String -> Either String (a, String)
+-- | The different types of tokens available for building commands.
+data Token
+  = Keyword String
+  | Variable Variable
+  | Literal Literal
 
--- Type class for a type that can be parsed.
-class Parse a where
-  parse :: Parser a
+newtype Variable = MkVariable String
 
-pChar :: Parser Char
-pChar [] = Left "No more input"
-pChar (x : xs) = Right (x, xs)
+data Literal = NumLiteral Integer | StringLiteral String
 
-pCheck :: (a -> Bool) -> Parser a -> Parser a
-pCheck check parser input =
-  let pResult = parser input
-   in case pResult of
-        Left err -> Left err
-        Right (p, rem) -> if check p then pResult else Left "Check on parse result failed"
-
+-- | A statement that can be typed into the command line.
 data Statement
-  = Set String String
-  | Get String
+  = Set Variable Literal
+  | Get Variable
 
 data Output = Continue | Quit deriving (Eq)
 
