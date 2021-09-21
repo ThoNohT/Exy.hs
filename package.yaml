@@ -25,8 +25,22 @@ library:
   source-dirs: src
   dependencies:
     - mtl
-    - parsec
-
+    - text
+    - containers
+    - system-fileio
+  default-extensions:
+    - GADTs
+    - StandaloneDeriving
+    - OverloadedStrings
+    - ScopedTypeVariables
+    - TypeApplications
+    - RankNTypes
+    - ExplicitForAll
+    - DataKinds
+    - TypeFamilies
+    - FlexibleInstances
+    - FlexibleContexts
+    - GeneralizedNewtypeDeriving
 executables:
   exy-exe:
     main:                Main.hs

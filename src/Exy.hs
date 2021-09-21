@@ -1,57 +1,34 @@
 module Exy (run) where
 
+import Data.Text
 import Control.Monad.State.Lazy
 import System.IO
-import Text.Parsec (alphaNum, anyChar, char, digit, letter, many1, (<|>), string)
-import Text.Parsec.Text.Lazy (Parser)
 import Prelude hiding (until)
 
-newtype Variable = MkVariable String
+-- Lexer
 
-data Literal = NumLiteral Integer | StringLiteral String
+data Location = Location { row :: Integer, col :: Integer, file :: String } deriving (Show, Eq, Ord)
+data TokenData = WordToken String | StringToken String | NumberToken Integer deriving (Show, Eq, Ord)
+data Token = Token { location :: Location, token :: TokenData } deriving (Show, Eq, Ord)
 
--- | A statement that can be typed into the command line.
-data Statement
-  = Set Variable Literal
-  | Get Variable
+lexToken :: Location -> Text -> Either String (Token, Location)
+lexToken loc input = Left "Not implemented..."
 
-variableParser :: Parser Variable
-variableParser = do
-  firstChar <- letter
-  otherChars <- many1 variableChar
-  pure $ MkVariable (firstChar : otherChars)
-  where
-    variableChar = alphaNum <|> char '_'
-
-numLiteral = do
-  nums <- many1 digit
-  pure $ NumLiteral $ read nums
-
-stringLiteral = do
-  chars <- char '"' *> many1 anyChar <* char '\"'
-  pure $ StringLiteral chars
-
-literalParser :: Parser Literal
-literalParser = numLiteral <|> stringLiteral
+lexFile :: Text -> Either String [ Token ]
+lexFile _ = Left "Not implemented"
 
 
-setStatementParser :: Parser Statement
-setStatementParser = do
-  _ <- string "set"
-  var <- variableParser
-  Set var <$> literalParser
+-- End lexer
 
-getStatementParser :: Parser Statement
-getStatementParser = do
-  _ <- string "get"
-  Get <$> variableParser
-
-statementParser :: Parser Statement
-statementParser = getStatementParser <|> setStatementParser
+-- Types
 
 data Output = Continue | Quit deriving (Eq)
 
 type ExyState = [String]
+
+-- End types
+
+-- Program
 
 run :: IO ()
 run = run' []
@@ -71,3 +48,5 @@ step = do
   case x of
     "quit" -> pure Quit
     _ -> pure Continue
+
+-- End program
