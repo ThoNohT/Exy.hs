@@ -27,7 +27,7 @@ library:
     - mtl
     - text
     - containers
-    - system-fileio
+    - directory
   default-extensions:
     - GADTs
     - StandaloneDeriving
