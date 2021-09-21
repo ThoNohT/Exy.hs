@@ -7,14 +7,14 @@ import Prelude hiding (until)
 
 -- Lexer
 
-data Location = Location { row :: Integer, col :: Integer, file :: String } deriving (Show, Eq, Ord)
-data TokenData = WordToken String | StringToken String | NumberToken Integer deriving (Show, Eq, Ord)
+data Location = Location { row :: Integer, col :: Integer, file :: Text } deriving (Show, Eq, Ord)
+data TokenData = WordToken Text | StringToken Text | NumberToken Integer deriving (Show, Eq, Ord)
 data Token = Token { location :: Location, token :: TokenData } deriving (Show, Eq, Ord)
 
-lexToken :: Location -> Text -> Either String (Token, Location)
+lexToken :: Location -> Text -> Either Text (Token, Location)
 lexToken loc input = Left "Not implemented..."
 
-lexFile :: Text -> Either String [ Token ]
+lexFile :: Text -> Either Text [ Token ]
 lexFile _ = Left "Not implemented"
 
 
@@ -24,7 +24,7 @@ lexFile _ = Left "Not implemented"
 
 data Output = Continue | Quit deriving (Eq)
 
-type ExyState = [String]
+type ExyState = [Text]
 
 -- End types
 
@@ -40,7 +40,7 @@ run = run' []
 step :: StateT ExyState IO Output
 step = do
   liftIO $ putStrLn "Type something..."
-  x <- liftIO getLine
+  x <- pack <$> liftIO getLine
   y <- get
   put $ x : y
   y <- get
