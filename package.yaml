@@ -30,6 +30,7 @@ library:
     - directory
   default-extensions:
     - GADTs
+    - LambdaCase
     - StandaloneDeriving
     - OverloadedStrings
     - ScopedTypeVariables

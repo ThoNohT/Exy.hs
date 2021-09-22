@@ -1,7 +1,8 @@
-module Exy (run, Location (..), TokenData (..), Token (..), lexFile) where
+module Exy (run, Parser (..), tokenP, parseText, Location (..), TokenData (..), Token (..), lexFile) where
 
 import Control.Monad.State.Lazy
 import Data.Char (isDigit, isLetter, isSpace)
+import Data.Function ((&))
 import Data.Functor ((<&>))
 import Data.Maybe (fromJust, fromMaybe)
 import qualified Data.Text as T
@@ -12,9 +13,8 @@ import Text.Printf (printf)
 import Prelude hiding (until)
 
 -- | Gets the first element from a 3-tuple.
-fst3 :: (a,b,c) -> a
-fst3 (a,_,_) = a
-
+fst3 :: (a, b, c) -> a
+fst3 (a, _, _) = a
 
 -- Lexer
 
@@ -68,11 +68,11 @@ consumeToken (loc, input) =
                 then convertResult (Token loc (WordToken nonWordChars)) nonWordChars
                 else error "None of the recognizable tokens matched."
 
-lexTokens :: Location -> T.Text -> [(Token, Location, T.Text)] -> [(Token, Location, T.Text)]
-lexTokens loc input acc =
+lexTokens :: Location -> [(Token, Location, T.Text)] -> T.Text -> [(Token, Location, T.Text)]
+lexTokens loc acc input =
   case consumeWhitespace (loc, input) <&> consumeToken of
     Nothing -> acc
-    Just (next, loc, rem) -> lexTokens loc rem ((next, loc, rem) : acc)
+    Just (next, loc, rem) -> lexTokens loc ((next, loc, rem) : acc) rem
 
 lexFile :: T.Text -> IO (Either T.Text [Token])
 lexFile fileName = do
@@ -81,9 +81,23 @@ lexFile fileName = do
     then pure $ Left "File does not exist"
     else do
       contents <- T.pack <$> readFile (T.unpack fileName)
-      pure $ Right $ reverse $ fst3 <$> lexTokens (Location 0 0 fileName) contents []
+      pure $ Right $ reverse $ fst3 <$> lexTokens (Location 0 0 fileName) [] contents
 
 -- End lexer
+
+-- Parser
+
+newtype Parser a = Parser {runParser :: [Token] -> Either (Location, T.Text) (a, [Token])}
+
+parseText :: Parser a -> T.Text -> Either (Location, T.Text) (a, [Token])
+parseText p txt = runParser p $ reverse $ fst3 <$> lexTokens (Location 0 0 "~") [] txt
+
+tokenP :: Parser Token
+tokenP = Parser $ \case
+  [] -> Left (Location 0 0 "", "Expected a token, but got nothing.")
+  x : xs -> Right (x, xs)
+
+-- End parser
 
 -- Types
 
