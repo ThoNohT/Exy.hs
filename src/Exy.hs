@@ -1,4 +1,4 @@
-module Exy (run, Parser (..), tokenP, parseText, Location (..), TokenData (..), Token (..), lexFile) where
+module Exy (run, Parser (..), tokenP, wordP, numP, parseText, Location (..), TokenData (..), Token (..), lexFile) where
 
 import Control.Monad.State.Lazy
 import Data.Char (isDigit, isLetter, isSpace)
@@ -6,11 +6,11 @@ import Data.Function ((&))
 import Data.Functor ((<&>))
 import Data.Maybe (fromJust, fromMaybe)
 import qualified Data.Text as T
-import GHC.Arr (accum)
 import System.Directory (doesFileExist)
 import System.IO
 import Text.Printf (printf)
 import Prelude hiding (until)
+import Data.Text.Internal.Lazy (Text)
 
 -- | Gets the first element from a 3-tuple.
 fst3 :: (a, b, c) -> a
@@ -31,10 +31,25 @@ nextRow loc = loc {row = row loc + 1, col = 0}
 
 data TokenData = WordToken T.Text | StringToken T.Text | NumberToken Integer deriving (Show, Eq, Ord)
 
+outputFormat :: TokenData -> T.Text
+outputFormat (WordToken w) = T.pack $ printf "word '%s'" w
+outputFormat (StringToken t) = T.pack $ printf "string '%s'" t
+outputFormat (NumberToken n) = T.pack $ printf "number '%i'" n
+
+isNumber :: TokenData -> Bool
+isNumber = \case
+  NumberToken _ -> True
+  _ -> False
+
+isWord :: T.Text -> TokenData -> Bool
+isWord name = \case
+  WordToken n | n == name -> True
+  _ -> False
+
 data Token = Token {location :: Location, token :: TokenData} deriving (Eq, Ord)
 
 instance Show Token where
-  show (Token loc token) = printf "%s: %s" (show loc) (show token)
+  show (Token loc token) = printf "%s: %s" (show loc) (outputFormat token)
 
 -- | Consumes characters until the first non-whitespace character.
 --
@@ -92,10 +107,28 @@ newtype Parser a = Parser {runParser :: [Token] -> Either (Location, T.Text) (a,
 parseText :: Parser a -> T.Text -> Either (Location, T.Text) (a, [Token])
 parseText p txt = runParser p $ reverse $ fst3 <$> lexTokens (Location 0 0 "~") [] txt
 
+-- | A parser that consumes the next token, regardless of what it is. Fails if there is no token left to consume.
+-- TODO: Is this function needed?
 tokenP :: Parser Token
 tokenP = Parser $ \case
   [] -> Left (Location 0 0 "", "Expected a token, but got nothing.")
   x : xs -> Right (x, xs)
+
+-- | A parser that consumes a word token with the specified word, and fails otherwise.
+wordP :: T.Text -> Parser Token
+wordP name = Parser $ \case
+  [] -> Left (Location 0 0 "", T.pack $ printf "Expected word '%s', but got nothing." name)
+  x : xs | (isWord name . token) x -> Right (x, xs)
+  x : _ -> Left (location x, T.pack $ printf "Expected word '%s' but got %s" name (outputFormat $ token x))
+
+numP :: Parser Token
+numP = Parser $ \case
+  [] -> Left (Location 0 0 "", "Expected a number token, but got nothing.")
+  x : xs | (isNumber . token) x -> Right (x, xs)
+  x : _ -> Left (location x, T.pack $ printf "Expected number token but got %s" (outputFormat $ token x))
+
+
+
 
 -- End parser
 
