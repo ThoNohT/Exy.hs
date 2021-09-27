@@ -1,4 +1,4 @@
-module Exy (run, Parser (..), tokenP, wordP, numP, parseText, Location (..), TokenData (..), Token (..), lexFile) where
+module Exy (ExyState, Output(..), Parser (..), tokenP, wordP, numP, parseText, Location (..), TokenData (..), Token (..), lexFile) where
 
 import Control.Monad.State.Lazy
 import Data.Char (isDigit, isLetter, isSpace)
@@ -140,25 +140,3 @@ type ExyState = [T.Text]
 
 -- End types
 
--- Program
-
-run :: IO ()
-run = run' []
-  where
-    run' st = do
-      (out, st') <- runStateT step st
-      if out == Quit then pure () else run' st'
-
-step :: StateT ExyState IO Output
-step = do
-  liftIO $ putStrLn "Type something..."
-  x <- T.pack <$> liftIO getLine
-  y <- get
-  put $ x : y
-  y <- get
-  liftIO $ print y
-  case x of
-    "quit" -> pure Quit
-    _ -> pure Continue
-
--- End program

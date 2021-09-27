@@ -1,6 +1,6 @@
 module Main where
 
-import Exy
+import qualified Runner as R (run)
 
 main :: IO ()
-main = run
+main = R.run
