@@ -46,6 +46,9 @@ instance Alternative Lexer where
   empty = Lexer $ const Nothing
   al <|> bl = Lexer $ \input -> runLexer al input <|> runLexer bl input
 
+instance Monad Lexer where
+  al >>= f = Lexer $ runLexer al >=> (\ (a, rest1) -> runLexer (f a) rest1)
+
 whitespace :: Lexer T.Text
 whitespace = Lexer $ \input -> consumeResult id input <$> notEmpty (T.takeWhile isSpace input)
 
