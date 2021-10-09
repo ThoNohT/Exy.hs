@@ -3,6 +3,7 @@ module Runner (run) where
 import Control.Monad.State.Lazy (StateT (runStateT), MonadIO (liftIO), MonadState (get, put))
 import Exy (ExyState, Output(..))
 import qualified Data.Text as T
+import Lexer (lexString)
 
 -- | Runs the Exy update loop.
 run :: IO ()
@@ -17,6 +18,8 @@ step :: StateT ExyState IO Output
 step = do
   liftIO $ putStrLn "Type something..."
   x <- T.pack <$> liftIO getLine
+  let lexed = lexString x
+  liftIO $ print lexed
   y <- get
   put $ x : y
   y <- get

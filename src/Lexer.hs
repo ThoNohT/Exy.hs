@@ -1,88 +1,81 @@
-module Lexer (Location (..), TokenData (..), Token (..), lexFile, lexTokens, isNumber, isWord, outputFormat) where
+module Lexer (Token (..), outputFormat, lexString) where
 
+import Control.Applicative (Alternative, empty, (<|>))
+import Control.Monad ((>=>))
 import Core (fst3)
+import Data.Bifunctor (first)
 import Data.Char (isDigit, isLetter, isSpace)
 import Data.Functor ((<&>))
 import qualified Data.Text as T
+import GHC.Exts (the)
 import System.Directory (doesFileExist)
+import Text.ParserCombinators.ReadP (satisfy)
 import Text.Printf (printf)
 
-data Location = Location {row :: Integer, col :: Integer, file :: T.Text} deriving (Eq, Ord)
+data Token
+  = NumberToken Integer
+  | OperatorToken String
+  deriving (Show, Eq, Ord)
 
-instance Show Location where
-  show (Location row col file) = printf "%s:%d:%d" file row col
-
-nextCol loc = loc {col = col loc + 1}
-
-addCols cols loc = loc {col = col loc + cols}
-
-nextRow loc = loc {row = row loc + 1, col = 0}
-
-data TokenData = WordToken T.Text | StringToken T.Text | NumberToken Integer deriving (Show, Eq, Ord)
-
-outputFormat :: TokenData -> T.Text
-outputFormat (WordToken w) = T.pack $ printf "word '%s'" w
-outputFormat (StringToken t) = T.pack $ printf "string '%s'" t
+outputFormat :: Token -> T.Text
 outputFormat (NumberToken n) = T.pack $ printf "number '%i'" n
+outputFormat (OperatorToken n) = T.pack $ printf "operator '%s'" n
 
-isNumber :: TokenData -> Bool
+-- | Returns the specified text, or Nothing if it is empty.
+notEmpty :: T.Text -> Maybe T.Text
+notEmpty "" = Nothing
+notEmpty x = Just x
+
+isNumber :: Token -> Bool
 isNumber = \case
   NumberToken _ -> True
   _ -> False
 
-isWord :: T.Text -> TokenData -> Bool
-isWord name = \case
-  WordToken n | n == name -> True
-  _ -> False
+-- ##### ##### ##### ##### ##### ##### ##### ##### ##### ##### --
 
-data Token = Token {location :: Location, token :: TokenData} deriving (Eq, Ord)
+newtype Lexer a = Lexer {runLexer :: T.Text -> Maybe (a, T.Text)}
 
-instance Show Token where
-  show (Token loc token) = printf "%s: %s" (show loc) (outputFormat token)
+instance Functor Lexer where
+  fmap f lexer = Lexer (fmap (first f) . runLexer lexer)
 
--- | Consumes characters until the first non-whitespace character.
---
--- Also updates the location to point to where the first non-whitespace character is located. If no non-whitespace
--- character is found until the end of the string, Nothing is returned.
-consumeWhitespace :: (Location, T.Text) -> Maybe (Location, T.Text)
-consumeWhitespace (loc, input) =
-  T.uncons input >>= \(c, rem) ->
-    case c of
-      '\n' -> consumeWhitespace (nextRow loc, rem)
-      _ | isSpace c -> consumeWhitespace (nextCol loc, rem)
-      _ -> Just (loc, input)
+instance Applicative Lexer where
+  pure a = Lexer $ \x -> Just (a, x)
+  fl <*> vl = Lexer $ runLexer fl >=> (\(f, rest1) -> fmap (first f) (runLexer vl rest1))
 
--- | Consumes a token.
---
--- Returns the parsed token, the location after the token where lexing can continue, and the remaining text.
-consumeToken :: (Location, T.Text) -> (Token, Location, T.Text)
-consumeToken (loc, input) =
-  let wordChars = T.takeWhile isLetter input
-      numChars = T.takeWhile isDigit input
-      nonWordChars = T.takeWhile (\c -> not (isLetter c) && not (isDigit c) && not (isSpace c)) input
+instance Alternative Lexer where
+  empty = Lexer $ const Nothing
+  al <|> bl = Lexer $ \input -> runLexer al input <|> runLexer bl input
 
-      convertResult token text = (token, addCols (toInteger $ T.length text) loc, T.drop (T.length text) input)
-   in if not $ T.null wordChars
-        then convertResult (Token loc (WordToken wordChars)) wordChars
-        else
-          if not $ T.null numChars
-            then convertResult (Token loc (NumberToken (read $ T.unpack numChars))) numChars
-            else
-              if not $ T.null nonWordChars
-                then convertResult (Token loc (WordToken nonWordChars)) nonWordChars
-                else error "None of the recognizable tokens matched."
+whitespace :: Lexer T.Text
+whitespace = Lexer $ \input -> consumeResult id input <$> notEmpty (T.takeWhile isSpace input)
 
-lexTokens :: Location -> [(Token, Location, T.Text)] -> T.Text -> [(Token, Location, T.Text)]
-lexTokens loc acc input =
-  case consumeWhitespace (loc, input) <&> consumeToken of
-    Nothing -> acc
-    Just (next, loc, rem) -> lexTokens loc ((next, loc, rem) : acc) rem
+consumeResult :: (T.Text -> a) -> T.Text -> T.Text -> (a, T.Text)
+consumeResult f input result = (f result, T.drop (T.length result) input)
 
-lexFile :: T.Text -> IO (Either T.Text [Token])
-lexFile fileName = do
-  exists <- doesFileExist (T.unpack fileName)
-  if not exists
-    then pure $ Left "File does not exist"
-    else do
-      contents <- T.pack <$> readFile (T.unpack fileName)
-      pure $ Right $ reverse $ fst3 <$> lexTokens (Location 0 0 fileName) [] contents
+number :: Lexer Integer
+number = Lexer $ \input ->
+  case T.uncons input of
+    Nothing -> Nothing
+    Just ('-', rest) -> first ((-1) *) <$> runLexer positiveNumber rest
+    _ -> runLexer positiveNumber input
+
+positiveNumber :: Lexer Integer
+positiveNumber = Lexer $ \input -> consumeResult (read . T.unpack) input <$> notEmpty (T.takeWhile isDigit input)
+
+operator :: Lexer String
+operator = Lexer $ \input ->
+  case T.uncons input of
+    Just ('-', rest) -> Just ("-", rest)
+    Just ('+', rest) -> Just ("+", rest)
+    _ -> Nothing
+
+token :: Lexer Token
+token = fmap NumberToken positiveNumber <|> fmap OperatorToken operator
+
+lexString :: T.Text -> Either String [Token]
+lexString input =
+  case (input, runLexer token input, runLexer whitespace input) of
+    ("", _, _) -> Right []
+    (_, Just (res, rest), _) -> fmap (res :) (lexString rest)
+    (_, Nothing, Just (_, rest)) -> lexString rest
+    (rest, Nothing, Nothing) -> Left $ printf "Failed lexing with remaining input: %s" rest
