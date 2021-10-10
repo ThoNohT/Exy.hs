@@ -12,6 +12,8 @@ import System.Directory (doesFileExist)
 import Text.ParserCombinators.ReadP (satisfy)
 import Text.Printf (printf)
 
+-- ##### ##### ##### ##### ##### ##### ##### ##### ##### ##### --
+
 data Token
   = NumberToken Integer
   | OperatorToken String
@@ -31,18 +33,20 @@ notEmpty x = Just x
 newtype Lexer a = Lexer {runLexer :: T.Text -> Maybe (a, T.Text)}
 
 instance Functor Lexer where
-  fmap f lexer = Lexer (fmap (first f) . runLexer lexer)
+  fmap f (Lexer l) = Lexer (fmap (first f) . l)
 
 instance Applicative Lexer where
   pure a = Lexer $ \x -> Just (a, x)
-  fl <*> vl = Lexer $ runLexer fl >=> (\(f, rest1) -> fmap (first f) (runLexer vl rest1))
+  Lexer lf <*> Lexer lv = Lexer $ lf >=> (\(f, rest1) -> fmap (first f) (lv rest1))
 
 instance Alternative Lexer where
   empty = Lexer $ const Nothing
-  al <|> bl = Lexer $ \input -> runLexer al input <|> runLexer bl input
+  Lexer la <|> Lexer lb = Lexer $ \input -> la input <|> lb input
 
 instance Monad Lexer where
-  al >>= f = Lexer $ runLexer al >=> (\ (a, rest1) -> runLexer (f a) rest1)
+  Lexer la >>= f = Lexer $ la >=> (\ (a, rest1) -> runLexer (f a) rest1)
+
+-- ##### ##### ##### ##### ##### ##### ##### ##### ##### ##### --
 
 whitespace :: Lexer T.Text
 whitespace = Lexer $ \input -> consumeResult id input <$> notEmpty (T.takeWhile isSpace input)
@@ -69,6 +73,8 @@ operator = Lexer $ \input ->
 
 token :: Lexer Token
 token = fmap NumberToken positiveNumber <|> fmap OperatorToken operator
+
+-- ##### ##### ##### ##### ##### ##### ##### ##### ##### ##### --
 
 lexString :: T.Text -> Either String [Token]
 lexString input =

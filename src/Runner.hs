@@ -4,6 +4,7 @@ import Control.Monad.State.Lazy (StateT (runStateT), MonadIO (liftIO), MonadStat
 import Exy (ExyState, Output(..))
 import qualified Data.Text as T
 import Lexer (lexString)
+import Parser (expression, runParser, end)
 
 -- | Runs the Exy update loop.
 run :: IO ()
@@ -17,13 +18,25 @@ run = run' []
 step :: StateT ExyState IO Output
 step = do
   liftIO $ putStrLn "Type something..."
-  x <- T.pack <$> liftIO getLine
-  let lexed = lexString x
+  input <- T.pack <$> liftIO getLine
+  let lexed = lexString input
+  let parsed =
+        case lexed of
+          Right tkns -> runParser (expression <* end) tkns
+          _ -> Left "No tokens to parse."
+
   liftIO $ print lexed
-  y <- get
-  put $ x : y
-  y <- get
-  liftIO $ print y
-  case x of
+  liftIO $ print parsed
+
+  case parsed of
+    Right (res, _) -> do
+      oldState <- get
+      put $ res : oldState
+      pure ()
+    _ -> pure ()
+
+  newState <- get
+  liftIO $ print newState
+  case input of
     "quit" -> pure Quit
     _ -> pure Continue
