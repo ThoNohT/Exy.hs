@@ -26,11 +26,6 @@ notEmpty :: T.Text -> Maybe T.Text
 notEmpty "" = Nothing
 notEmpty x = Just x
 
-isNumber :: Token -> Bool
-isNumber = \case
-  NumberToken _ -> True
-  _ -> False
-
 -- ##### ##### ##### ##### ##### ##### ##### ##### ##### ##### --
 
 newtype Lexer a = Lexer {runLexer :: T.Text -> Maybe (a, T.Text)}
@@ -81,4 +76,4 @@ lexString input =
     ("", _, _) -> Right []
     (_, Just (res, rest), _) -> fmap (res :) (lexString rest)
     (_, Nothing, Just (_, rest)) -> lexString rest
-    (rest, Nothing, Nothing) -> Left $ printf "Failed lexing with remaining input: %s" rest
+    (rest, Nothing, Nothing) -> Left $ printf "Failed lexing with remaining input: '%s'" rest
