@@ -1,4 +1,4 @@
-module Lexer (Token (..), outputFormat, lexString) where
+module Lexer (Token (..), outputFormat, lexText) where
 
 import Control.Applicative (Alternative, empty, (<|>))
 import Control.Monad ((>=>))
@@ -16,7 +16,7 @@ import Text.Printf (printf)
 
 data Token
   = NumberToken Integer
-  | OperatorToken String
+  | OperatorToken T.Text
   deriving (Show, Eq, Ord)
 
 outputFormat :: Token -> T.Text
@@ -64,7 +64,7 @@ number = Lexer $ \input ->
 positiveNumber :: Lexer Integer
 positiveNumber = Lexer $ \input -> consumeResult (read . T.unpack) input <$> notEmpty (T.takeWhile isDigit input)
 
-operator :: Lexer String
+operator :: Lexer T.Text
 operator = Lexer $ \input ->
   case T.uncons input of
     Just ('-', rest) -> Just ("-", rest)
@@ -76,10 +76,10 @@ token = fmap NumberToken positiveNumber <|> fmap OperatorToken operator
 
 -- ##### ##### ##### ##### ##### ##### ##### ##### ##### ##### --
 
-lexString :: T.Text -> Either String [Token]
-lexString input =
+lexText :: T.Text -> Either T.Text [Token]
+lexText input =
   case (input, runLexer token input, runLexer whitespace input) of
     ("", _, _) -> Right []
-    (_, Just (res, rest), _) -> fmap (res :) (lexString rest)
-    (_, Nothing, Just (_, rest)) -> lexString rest
-    (rest, Nothing, Nothing) -> Left $ printf "Failed lexing with remaining input: '%s'" rest
+    (_, Just (res, rest), _) -> fmap (res :) (lexText rest)
+    (_, Nothing, Just (_, rest)) -> lexText rest
+    (rest, Nothing, Nothing) -> Left $ T.pack $ printf "Failed lexing with remaining input: '%s'" rest

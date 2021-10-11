@@ -51,6 +51,16 @@ check checkFn p = p >>= checkParser
         Right e -> Right (e, input)
         Left r -> Left r
 
+numberToken :: Parser Integer
+numberToken = token & check (\case
+  NumberToken n -> Right n
+  _ -> Left "Expected number token.")
+
+operatorToken :: Parser T.Text
+operatorToken = token & check (\case
+  OperatorToken op -> Right op
+  _ -> Left "Expected operator token.")
+
 -- | A parser that succeeds only if there is no more input to consume.
 end :: Parser ()
 end = Parser $ \case
@@ -62,16 +72,18 @@ entire :: Parser a -> Parser a
 entire p = p <* end
 
 operator :: Parser Operator
-operator = token & check (\case
-  OperatorToken "+" -> Right Plus
-  OperatorToken "-" -> Right Minus
-  OperatorToken op -> Left $ T.pack $ printf "Invalid operator token: '%s'" op
-  _ -> Left "Not an operator token.")
+operator = operatorToken & check (\case
+  "+" -> Right Plus
+  "-" -> Right Minus
+  op -> Left $ T.pack $ printf "Invalid operator token: '%s'." op)
 
 primitive :: Parser Primitive
-primitive = token & check (\case
-  NumberToken n -> Right $ Number n
-  _ -> Left "Not a primitive token.")
+primitive = Number <$> (numberToken <|> ((* (-1)) <$> (minusOp *> numberToken)))
+  where
+    -- TODO: Require the minus to be attached to the number in the future?
+    minusOp = operatorToken & check (\case
+      "-" -> Right ()
+      _ -> Left "Only minus operator can be prefixed to a number")
 
 expression :: Parser Expression
 expression = flip BinaryExpression <$> primitive <*> operator <*> primitive
