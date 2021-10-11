@@ -25,7 +25,6 @@ step = do
           Right tkns -> runParser (expression <* end) tkns
           _ -> Left "No tokens to parse."
 
-  liftIO $ print lexed
   liftIO $ print parsed
 
   case parsed of

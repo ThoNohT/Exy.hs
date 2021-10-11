@@ -1,4 +1,4 @@
-module Lexer (Token (..), outputFormat, lexText) where
+module Lexer (Token (..), outputFormat, LexInfo(..), lexText) where
 
 import Control.Applicative (Alternative, empty, (<|>))
 import Control.Monad ((>=>))
@@ -76,10 +76,16 @@ token = fmap NumberToken positiveNumber <|> fmap OperatorToken operator
 
 -- ##### ##### ##### ##### ##### ##### ##### ##### ##### ##### --
 
-lexText :: T.Text -> Either T.Text [Token]
+data LexInfo a = LexInfo { tkn :: a, whitespaceBefore :: Bool } deriving  Show
+
+lexText :: T.Text -> Either T.Text [LexInfo Token]
 lexText input =
-  case (input, runLexer token input, runLexer whitespace input) of
+  let
+    wrapToken :: Bool -> Token -> LexInfo Token
+    wrapToken hasWs tkn = LexInfo { tkn = tkn , whitespaceBefore = hasWs }
+  in
+  case (input, runLexer (whitespace *> token) input, runLexer token input) of
     ("", _, _) -> Right []
-    (_, Just (res, rest), _) -> fmap (res :) (lexText rest)
-    (_, Nothing, Just (_, rest)) -> lexText rest
+    (_, Just (res, rest), _) -> fmap (wrapToken True res :) (lexText rest)
+    (_, Nothing, Just (res, rest)) -> fmap (wrapToken False res :) (lexText rest)
     (rest, Nothing, Nothing) -> Left $ T.pack $ printf "Failed lexing with remaining input: '%s'" rest
