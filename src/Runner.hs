@@ -19,12 +19,8 @@ step :: StateT ExyState IO Output
 step = do
   liftIO $ putStrLn "Type something..."
   input <- T.pack <$> liftIO getLine
-  let lexed = lexText input
-  let parsed =
-        case lexed of
-          Right tkns -> runParser (expression <* end) tkns
-          _ -> Left "No tokens to parse."
 
+  let parsed = runParser (expression <* end) =<< lexText input
   liftIO $ print parsed
 
   case parsed of
