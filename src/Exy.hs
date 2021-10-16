@@ -12,9 +12,15 @@ type ExyState = [Expression]
 
 newtype Primitive = Number Integer deriving (Show)
 data Operator = Plus | Minus deriving (Show)
+newtype Variable = Variable T.Text
 
 -- Composite types
 
 data Expression
   = UnaryExpression Primitive
   | BinaryExpression Operator Primitive Primitive deriving (Show)
+
+
+data Statement
+  = Store Variable Expression
+  | Load Variable
