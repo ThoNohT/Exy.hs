@@ -15,4 +15,6 @@ data Operator = Plus | Minus deriving (Show)
 
 -- Composite types
 
-data Expression = BinaryExpression Operator Primitive Primitive deriving (Show)
+data Expression
+  = UnaryExpression Primitive
+  | BinaryExpression Operator Primitive Primitive deriving (Show)

@@ -99,5 +99,8 @@ primitive = Number <$> ((tkn <$> numberToken) <|> ((* (-1)) . tkn <$> (minusOp *
       _ -> Left "Only minus operator can be prefixed to a number")
 
 expression :: Parser Expression
-expression = flip BinaryExpression <$> primitive <*> operator <*> primitive
+expression = binary <|> unary
+  where
+    binary = flip BinaryExpression <$> primitive <*> operator <*> primitive
+    unary = UnaryExpression <$> primitive
 
