@@ -87,16 +87,17 @@ operator = operatorToken & check (\v -> case tkn v of
   op -> Left $ T.pack $ printf "Invalid operator token: '%s'." op)
 
 primitive :: Parser Primitive
-primitive = Number <$> ((tkn <$> numberToken) <|> ((* (-1)) . tkn <$> (minusOp *> noSpaceNumberToken)))
+primitive = Number <$> (tkn <$> numberToken <|> ((*) <$> minusOp <*> noSpaceNumberToken))
   where
     noSpaceNumberToken = numberToken & check
       (\v -> if whitespaceBefore v
-         then Left "Negative number canont have whitespace between number an '-' symbol."
-         else Right v)
+         then Left "Negative number cannot have whitespace between number an '-' symbol."
+         else Right $ tkn v)
 
     minusOp = operatorToken & check (\v -> case tkn v of
-      "-" -> Right ()
-      _ -> Left "Only minus operator can be prefixed to a number")
+      "-" -> Right (-1 :: Integer)
+      "+" -> Right 1
+      _ -> Left "Only minus or plus operator can be prefixed to a number")
 
 expression :: Parser Expression
 expression = binary <|> unary
