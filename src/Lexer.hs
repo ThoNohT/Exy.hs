@@ -2,7 +2,7 @@ module Lexer (Token (..), LexInfo (..), lexText) where
 
 import Control.Applicative (Alternative, empty, (<|>))
 import Control.Monad ((>=>))
-import Core (fst3, filterMaybe)
+import Core (filterMaybe, fst3)
 import Data.Bifunctor (first)
 import Data.Char (isDigit, isLetter, isSpace)
 import Data.Functor ((<&>))

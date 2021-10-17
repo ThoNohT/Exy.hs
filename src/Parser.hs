@@ -1,17 +1,20 @@
-module Parser (Parser(..), end, entire, operator, primitive, expression) where
+module Parser (Parser (..), end, entire, statement) where
 
-import Core (fst3)
-import qualified Data.Text as T
-import Lexer (Token (..), LexInfo(..))
-import Text.Printf (printf)
-import Exy (Expression(..), Primitive(..), Operator(..))
-import qualified Data.List as List
-import Control.Applicative (Alternative, (<|>), empty)
+import Control.Applicative (Alternative, empty, (<|>))
+import Control.Arrow ((>>>))
 import Control.Monad ((>=>))
+import Core (fst3)
 import Data.Bifunctor (first)
 import Data.Function ((&))
-import Control.Arrow ((>>>))
 import Data.Functor ((<&>))
+import qualified Data.List as List
+import Data.Set (Set)
+import qualified Data.Set as Set (fromList, member)
+import qualified Data.Text as T
+import Exy (Expression (..), Operator (..), Primitive (..), Statement (..), Variable (Variable))
+import qualified GHC.TypeLits as T
+import Lexer (LexInfo (..), Token (..))
+import Text.Printf (printf)
 
 -- ##### ##### ##### ##### ##### ##### ##### ##### ##### ##### --
 
@@ -33,7 +36,7 @@ instance Alternative Parser where
       Left _ -> Left leftErr
 
 instance Monad Parser where
-  Parser pa >>= f = Parser $ pa >=> (\ (a, rest1) -> runParser (f a) rest1)
+  Parser pa >>= f = Parser $ pa >=> (\(a, rest1) -> runParser (f a) rest1)
 
 -- ##### ##### ##### ##### ##### ##### ##### ##### ##### ##### --
 
@@ -49,26 +52,46 @@ token = Parser $ \case
 check :: (a -> Either T.Text b) -> Parser a -> Parser b
 check checkFn p = p >>= checkParser
   where
-      checkParser v = Parser $ \input -> case checkFn v of
-        Right e -> Right (e, input)
-        Left r -> Left r
+    checkParser v = Parser $ \input -> case checkFn v of
+      Right e -> Right (e, input)
+      Left r -> Left r
 
 -- | Like check, but runs the check on the token in a LexInfo, and transforms only the token, not the info around it.
 checkTkn :: (a -> Either T.Text b) -> Parser (LexInfo a) -> Parser (LexInfo b)
-checkTkn checkFn = check (\v ->
-  case checkFn $ tkn v of
-    Right v' -> Right $ LexInfo { tkn = v', whitespaceBefore =  whitespaceBefore v }
-    Left err -> Left err)
+checkTkn checkFn =
+  check
+    ( \v ->
+        case checkFn $ tkn v of
+          Right v' -> Right $ LexInfo {tkn = v', whitespaceBefore = whitespaceBefore v}
+          Left err -> Left err
+    )
 
 numberToken :: Parser (LexInfo Integer)
-numberToken = token & checkTkn (\case
-  NumberToken n -> Right n
-  _ -> Left "Expected number token.")
+numberToken =
+  token
+    & checkTkn
+      ( \case
+          NumberToken n -> Right n
+          _ -> Left "Expected number token."
+      )
+
+wordToken :: Parser (LexInfo T.Text)
+wordToken =
+  token
+    & checkTkn
+      ( \case
+          WordToken n -> Right n
+          _ -> Left "Expected word token."
+      )
 
 operatorToken :: Parser (LexInfo T.Text)
-operatorToken = token & checkTkn (\case
-  OperatorToken op -> Right op
-  _ -> Left "Expected operator token.")
+operatorToken =
+  token
+    & checkTkn
+      ( \case
+          OperatorToken op -> Right op
+          _ -> Left "Expected operator token."
+      )
 
 -- | A parser that succeeds only if there is no more input to consume.
 end :: Parser ()
@@ -81,23 +104,61 @@ entire :: Parser a -> Parser a
 entire p = p <* end
 
 operator :: Parser Operator
-operator = operatorToken & check (\v -> case tkn v of
-  "+" -> Right Plus
-  "-" -> Right Minus
-  op -> Left $ T.pack $ printf "Invalid operator token: '%s'." op)
+operator =
+  operatorToken
+    & check
+      ( \v -> case tkn v of
+          "+" -> Right Plus
+          "-" -> Right Minus
+          op -> Left $ T.pack $ printf "Invalid operator token: '%s'." op
+      )
 
 primitive :: Parser Primitive
 primitive = Number <$> (tkn <$> numberToken <|> ((*) <$> minusOp <*> noSpaceNumberToken))
   where
-    noSpaceNumberToken = numberToken & check
-      (\v -> if whitespaceBefore v
-         then Left "Negative number cannot have whitespace between number an '-' symbol."
-         else Right $ tkn v)
+    noSpaceNumberToken =
+      numberToken
+        & check
+          ( \v ->
+              if whitespaceBefore v
+                then Left "Negative number cannot have whitespace between number an '-' symbol."
+                else Right $ tkn v
+          )
 
-    minusOp = operatorToken & check (\v -> case tkn v of
-      "-" -> Right (-1 :: Integer)
-      "+" -> Right 1
-      _ -> Left "Only minus or plus operator can be prefixed to a number")
+    minusOp =
+      operatorToken
+        & check
+          ( \v -> case tkn v of
+              "-" -> Right (-1 :: Integer)
+              "+" -> Right 1
+              _ -> Left "Only minus or plus operator can be prefixed to a number"
+          )
+
+keywords :: Set T.Text
+keywords = Set.fromList ["store", "load"]
+
+keyword :: Parser T.Text
+keyword = wordToken & check (\w -> if Set.member (tkn w) keywords then Right (tkn w) else Left "Word is not a keyword")
+
+variable :: Parser Variable
+variable =
+  wordToken
+    & check
+      ( \w ->
+          if Set.member (tkn w) keywords
+            then Left $ T.pack $ printf "Keyword '%s' cannot be a variable." $ tkn w
+            else Right $ Variable $ tkn w
+      )
+
+pKeyword :: T.Text -> Parser T.Text
+pKeyword name =
+  keyword
+    & check
+      ( \w ->
+          if w == name
+            then Right w
+            else Left $ T.pack $ printf "Expected '%s' keyword but got '%s'." name w
+      )
 
 expression :: Parser Expression
 expression = binary <|> unary
@@ -105,3 +166,8 @@ expression = binary <|> unary
     binary = flip BinaryExpression <$> primitive <*> operator <*> primitive
     unary = UnaryExpression <$> primitive
 
+statement :: Parser Statement
+statement = storeStatement <|> loadStatement
+  where
+    loadStatement = Load <$> (pKeyword "load" *> variable)
+    storeStatement = Store <$> (pKeyword "store" *> variable) <*> expression
