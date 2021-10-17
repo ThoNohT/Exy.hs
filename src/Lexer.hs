@@ -69,7 +69,7 @@ operator = Lexer $ \input ->
     _ -> Nothing
 
 word :: Lexer T.Text
-word = T.cons <$> firstChar <*> otherChars
+word = T.cons <$> firstChar <*> (otherChars <|> pure "")
   where
     firstChar = Lexer $ filterMaybe (isWordChar True . fst) . T.uncons
     otherChars = Lexer $ \input -> consumeResult id input <$> notEmpty (T.takeWhile (isWordChar False) input)
