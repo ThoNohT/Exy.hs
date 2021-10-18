@@ -160,10 +160,12 @@ pKeyword name =
             else Left $ T.pack $ printf "Expected '%s' keyword but got '%s'." name w
       )
 
-expression :: Parser Expression
-expression = binary <|> expr <|> var
+expression :: Bool -> Parser Expression
+expression descend = if descend then binary <|> expr <|> var else expr <|> var
   where
-    binary = BinaryExpression <$> operator <*> expression <*> expression
+    -- Expressions can only expand on the right side, making the operators left-associative
+    -- Eg. "1 + 2 + 3" --> can only be parsed to 1 + (2 + 3) since the left cannot descend.
+    binary = flip BinaryExpression <$> expression False <*> operator <*> expression True
     expr = PrimitiveExpression <$> primitive
     var = VariableReference <$> variable
 
@@ -172,4 +174,4 @@ statement = store <|> load <|> clear
   where
     load = Load <$> (pKeyword "load" *> variable)
     clear = Clear <$> (pKeyword "clear" *> variable)
-    store = Store <$> (pKeyword "store" *> variable) <*> expression
+    store = Store <$> (pKeyword "store" *> variable) <*> expression True
