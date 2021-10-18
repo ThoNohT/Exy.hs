@@ -67,6 +67,9 @@ operator = Lexer $ \input ->
   case T.uncons input of
     Just ('-', rest) -> Just ("-", rest)
     Just ('+', rest) -> Just ("+", rest)
+    Just ('=', rest) -> Just ("=", rest)
+    Just ('|', rest) -> Just ("|", rest)
+    Just ('&', rest) -> Just ("&", rest)
     _ -> Nothing
 
 bracket :: Lexer T.Text

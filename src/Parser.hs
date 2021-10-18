@@ -119,12 +119,19 @@ operator =
       ( \v -> case tkn v of
           "+" -> Right Plus
           "-" -> Right Minus
+          "=" -> Right Equals
+          "|" -> Right Or
+          "&" -> Right And
           op -> Left $ T.pack $ printf "Invalid operator token: '%s'." op
       )
 
 primitive :: Parser Primitive
-primitive = Number <$> (tkn <$> numberToken <|> ((*) <$> minusOp <*> noSpaceNumberToken))
+primitive = Number <$> number <|> Truth <$> truth
   where
+    number = tkn <$> numberToken <|> ((*) <$> minusOp <*> noSpaceNumberToken)
+
+    truth = True <$ pKeyword "yes" <|> False <$ pKeyword "no"
+
     noSpaceNumberToken =
       numberToken
         & check
@@ -144,7 +151,7 @@ primitive = Number <$> (tkn <$> numberToken <|> ((*) <$> minusOp <*> noSpaceNumb
           )
 
 keywords :: Set T.Text
-keywords = Set.fromList ["store", "load", "clear"]
+keywords = Set.fromList ["store", "load", "clear", "yes", "no"]
 
 keyword :: Parser T.Text
 keyword = wordToken & check (\w -> if Set.member (tkn w) keywords then Right (tkn w) else Left "Word is not a keyword")

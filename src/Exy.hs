@@ -26,16 +26,23 @@ type ExyState = Map Variable Expression
 
 -- Primitive types
 
-newtype Primitive = Number Integer deriving (Show)
+data Primitive
+    = Number Integer
+    | Truth Bool deriving (Show)
 
 instance ShowExpr Primitive where
   showExpr (Number n) = T.pack $ show n
+  showExpr (Truth True) = "Yes"
+  showExpr (Truth False) = "No"
 
-data Operator = Plus | Minus deriving (Show)
+data Operator = Plus | Minus | Equals | Or | And deriving (Show)
 
 instance ShowExpr Operator where
   showExpr Plus = "+"
   showExpr Minus = "-"
+  showExpr Equals = "="
+  showExpr Or = "|"
+  showExpr And = "&"
 
 newtype Variable = Variable T.Text deriving (Show, Eq, Ord)
 
