@@ -35,6 +35,11 @@ step = do
         Store var expr -> do
           oldState <- get
           put $ Map.insert var expr oldState
+          liftIO $ putStrLn "Stored"
+        Clear var -> do
+          oldState <- get
+          put $ Map.delete var oldState
+          liftIO $ putStrLn "Cleared"
     Left err -> liftIO $ putStrLn $ T.unpack err
 
   case input of

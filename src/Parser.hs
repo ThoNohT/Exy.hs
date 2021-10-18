@@ -135,7 +135,7 @@ primitive = Number <$> (tkn <$> numberToken <|> ((*) <$> minusOp <*> noSpaceNumb
           )
 
 keywords :: Set T.Text
-keywords = Set.fromList ["store", "load"]
+keywords = Set.fromList ["store", "load", "clear"]
 
 keyword :: Parser T.Text
 keyword = wordToken & check (\w -> if Set.member (tkn w) keywords then Right (tkn w) else Left "Word is not a keyword")
@@ -161,13 +161,15 @@ pKeyword name =
       )
 
 expression :: Parser Expression
-expression = binary <|> unary
+expression = binary <|> expr <|> var
   where
-    binary = flip BinaryExpression <$> primitive <*> operator <*> primitive
-    unary = UnaryExpression <$> primitive
+    binary = BinaryExpression <$> operator <*> expression <*> expression
+    expr = PrimitiveExpression <$> primitive
+    var = VariableReference <$> variable
 
 statement :: Parser Statement
-statement = storeStatement <|> loadStatement
+statement = store <|> load <|> clear
   where
-    loadStatement = Load <$> (pKeyword "load" *> variable)
-    storeStatement = Store <$> (pKeyword "store" *> variable) <*> expression
+    load = Load <$> (pKeyword "load" *> variable)
+    clear = Clear <$> (pKeyword "clear" *> variable)
+    store = Store <$> (pKeyword "store" *> variable) <*> expression

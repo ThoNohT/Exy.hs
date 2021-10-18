@@ -20,11 +20,13 @@ newtype Variable = Variable T.Text deriving (Show, Eq, Ord)
 -- Composite types
 
 data Expression
-  = UnaryExpression Primitive
-  | BinaryExpression Operator Primitive Primitive
+  = PrimitiveExpression Primitive
+  | VariableReference Variable
+  | BinaryExpression Operator Expression Expression
   deriving (Show)
 
 data Statement
   = Store Variable Expression
   | Load Variable
+  | Clear Variable
   deriving (Show)
