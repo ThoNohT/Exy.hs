@@ -1,7 +1,7 @@
 module Runner (run) where
 
 import Control.Monad.State.Lazy (StateT (runStateT), MonadIO (liftIO), MonadState (get, put))
-import Exy (ExyState, Output(..), Statement (..))
+import Exy (ExyState, Output(..), Statement (..), showExpr)
 import qualified Data.Text as T
 import Lexer (lexText)
 import Parser (Parser, statement, runParser, end)
@@ -31,7 +31,7 @@ step = do
           let val = Map.lookup var oldState
           case val of
             Nothing -> liftIO $ putStrLn "Variable not found"
-            Just expr -> liftIO $ print expr
+            Just expr -> liftIO $ putStrLn $ T.unpack $ showExpr expr
         Store var expr -> do
           oldState <- get
           put $ Map.insert var expr oldState
