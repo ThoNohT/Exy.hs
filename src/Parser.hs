@@ -93,6 +93,15 @@ operatorToken =
           _ -> Left "Expected operator token."
       )
 
+bracketToken :: Parser (LexInfo T.Text)
+bracketToken =
+  token
+    & checkTkn
+      ( \case
+          BracketToken b -> Right b
+          _ -> Left "Expected bracket token."
+      )
+
 -- | A parser that succeeds only if there is no more input to consume.
 end :: Parser ()
 end = Parser $ \case
@@ -140,6 +149,16 @@ keywords = Set.fromList ["store", "load", "clear"]
 keyword :: Parser T.Text
 keyword = wordToken & check (\w -> if Set.member (tkn w) keywords then Right (tkn w) else Left "Word is not a keyword")
 
+bracket :: T.Text -> Parser ()
+bracket str =
+  bracketToken
+    & check
+      ( \b ->
+          if tkn b == str
+            then Right ()
+            else Left $ T.pack $ printf "Expected bracket '%s' but got '%s'" str (tkn b)
+      )
+
 variable :: Parser Variable
 variable =
   wordToken
@@ -161,12 +180,14 @@ pKeyword name =
       )
 
 expression :: Bool -> Parser Expression
-expression descend = if descend then binary <|> expr <|> var else expr <|> var
+expression descend = if descend then binary <|> nonDescending else nonDescending
   where
+    nonDescending = grouped <|> prim <|> var
     -- Expressions can only expand on the right side, making the operators left-associative
     -- Eg. "1 + 2 + 3" --> can only be parsed to 1 + (2 + 3) since the left cannot descend.
     binary = flip BinaryExpression <$> expression False <*> operator <*> expression True
-    expr = PrimitiveExpression <$> primitive
+    grouped = GroupedExpression <$> (bracket "(" *> expression True <* bracket ")")
+    prim = PrimitiveExpression <$> primitive
     var = VariableReference <$> variable
 
 statement :: Parser Statement

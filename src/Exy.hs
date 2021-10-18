@@ -23,6 +23,7 @@ data Expression
   = PrimitiveExpression Primitive
   | VariableReference Variable
   | BinaryExpression Operator Expression Expression
+  | GroupedExpression Expression
   deriving (Show)
 
 data Statement

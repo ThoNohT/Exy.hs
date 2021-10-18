@@ -18,6 +18,7 @@ data Token
   = NumberToken Integer
   | OperatorToken T.Text
   | WordToken T.Text
+  | BracketToken T.Text
   deriving (Show, Eq, Ord)
 
 -- | Returns the specified text, or Nothing if it is empty.
@@ -68,6 +69,13 @@ operator = Lexer $ \input ->
     Just ('+', rest) -> Just ("+", rest)
     _ -> Nothing
 
+bracket :: Lexer T.Text
+bracket = Lexer $ \input ->
+  case T.uncons input of
+    Just ('(', rest) -> Just ("(", rest)
+    Just (')', rest) -> Just (")", rest)
+    _ -> Nothing
+
 word :: Lexer T.Text
 word = T.cons <$> firstChar <*> (otherChars <|> pure "")
   where
@@ -76,7 +84,11 @@ word = T.cons <$> firstChar <*> (otherChars <|> pure "")
     isWordChar firstChar c = isLetter c || c == '_' || c == '-' || (not firstChar && isDigit c)
 
 token :: Lexer Token
-token = fmap NumberToken positiveNumber <|> fmap OperatorToken operator <|> fmap WordToken word
+token =
+  fmap NumberToken positiveNumber
+    <|> fmap OperatorToken operator
+    <|> fmap WordToken word
+    <|> fmap BracketToken bracket
 
 -- ##### ##### ##### ##### ##### ##### ##### ##### ##### ##### --
 
