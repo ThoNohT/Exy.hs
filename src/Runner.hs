@@ -1,11 +1,13 @@
 module Runner (run) where
 
-import Control.Monad.State.Lazy (StateT (runStateT), MonadIO (liftIO), MonadState (get, put))
-import Exy (ExyState, Output(..), Statement (..), showExpr)
-import qualified Data.Text as T
-import Lexer (lexText)
-import Parser (Parser, statement, runParser, end)
+import Control.Monad (foldM_)
+import Control.Monad.State.Lazy (MonadIO (liftIO), MonadState (get, put), StateT (runStateT))
 import Data.Map.Strict as Map
+import qualified Data.Text as T
+import Exy (Declaration (..), ExyState, Output (..), Statement (..), createDeclaration, showExpr)
+import Lexer (lexText)
+import Parser (Parser, end, runParser, statement)
+import Text.Printf (printf)
 
 -- | Runs the Exy update loop.
 run :: IO ()
@@ -30,11 +32,15 @@ step = do
           oldState <- get
           let val = Map.lookup var oldState
           case val of
-            Nothing -> liftIO $ putStrLn "Variable not found"
-            Just expr -> liftIO $ putStrLn $ T.unpack $ showExpr expr
+            Nothing -> liftIO $ putStrLn $ printf "Variable declaration '%s' not found" (show var)
+            Just decl -> do
+              liftIO $ putStrLn $ printf "Expression: %s" (showExpr (declExpr decl))
+              liftIO $ foldM_ (\_ e -> putStrLn $ printf "Error: %s" e) () (declErrors decl)
+              liftIO $ foldM_ (\_ t -> putStrLn $ printf "Type: %s" $ show t) () (declType decl)
         Store var expr -> do
           oldState <- get
-          put $ Map.insert var expr oldState
+          let decl = createDeclaration oldState expr
+          put $ Map.insert var decl oldState
           liftIO $ putStrLn "Stored"
         Clear var -> do
           oldState <- get

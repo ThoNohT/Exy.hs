@@ -7,11 +7,19 @@ module Exy
     Operator (..),
     Variable (..),
     Expression (..),
+    Declaration (..),
     Statement (..),
+    expressionType,
+    createDeclaration,
   )
 where
 
+import Core (setFromMaybe)
+import qualified Data.List as List
 import Data.Map.Strict (Map)
+import qualified Data.Map.Strict as Map
+import Data.Set (Set)
+import qualified Data.Set as Set
 import qualified Data.Text as T
 import Text.Printf (printf)
 
@@ -22,13 +30,69 @@ class ShowExpr a where
 
 data Output = Continue | Quit deriving (Eq)
 
-type ExyState = Map Variable Expression
+type ExyState = Map Variable Declaration
+
+data DeclarationError
+  = ParseError T.Text
+  | TypeError T.Text
+
+-- TODO: Store dependent variables so we can store computed values and update all dependencies.
+data Declaration = Declaration
+  { declExpr :: Expression,
+    declType :: Maybe Type,
+    declErrors :: [T.Text]
+  }
+
+createDeclaration :: ExyState -> Expression -> Declaration
+createDeclaration state expr =
+  let types = expressionType state expr
+
+      resolvedType =
+        case Set.toList types of
+          [t] -> Just t
+          _ -> Nothing
+
+      typeError =
+        case Set.toList types of
+          [] -> ["No type could be determined for the expression"]
+          [_] -> []
+          xs ->
+            [ T.pack $
+                printf
+                  "Expression type could not be uniquely identified, candidates: %s"
+                  (unwords $ List.intersperse "," $ map show xs)
+            ]
+   in Declaration
+        { declExpr = expr,
+          declType = resolvedType,
+          declErrors = typeError
+        }
+
+data Type = TypeNumber | TypeTruth deriving (Eq, Ord)
+
+instance Show Type where
+  show TypeNumber = "number"
+  show TypeTruth = "truth"
+
+expressionType :: ExyState -> Expression -> Set Type
+expressionType _ (PrimitiveExpression p) = Set.singleton $ primitiveType p
+expressionType state (VariableReference v) = setFromMaybe $ variableType state v
+expressionType state (BinaryExpression _ l r) = Set.union (expressionType state l) (expressionType state r)
+expressionType state (GroupedExpression e) = expressionType state e
+
+variableType :: ExyState -> Variable -> Maybe Type
+variableType state var = declType =<< Map.lookup var state
+
+primitiveType :: Primitive -> Type
+primitiveType (Number _) = TypeNumber
+primitiveType (Truth _) = TypeTruth
 
 -- Primitive types
 
 data Primitive
-    = Number Integer
-    | Truth Bool deriving (Show)
+  = Number Integer
+  | Truth Bool
+  deriving (Show)
 
 instance ShowExpr Primitive where
   showExpr (Number n) = T.pack $ show n
