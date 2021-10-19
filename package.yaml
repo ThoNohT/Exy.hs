@@ -27,6 +27,7 @@ library:
     - mtl
     - text
     - containers
+    - either
     - directory
   default-extensions:
     - GADTs

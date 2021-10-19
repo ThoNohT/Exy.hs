@@ -35,8 +35,9 @@ step = do
             Nothing -> liftIO $ putStrLn $ printf "Variable declaration '%s' not found" (show var)
             Just decl -> do
               liftIO $ putStrLn $ printf "Expression: %s" (showExpr (declExpr decl))
-              liftIO $ foldM_ (\_ e -> putStrLn $ printf "Error: %s" e) () (declErrors decl)
-              liftIO $ foldM_ (\_ t -> putStrLn $ printf "Type: %s" $ show t) () (declType decl)
+              liftIO $ case declType decl of
+                Left err -> putStrLn $ printf "Type Error: %s" err
+                Right t -> putStrLn $ printf "Type: %s" $ show t
         Store var expr -> do
           oldState <- get
           let decl = createDeclaration oldState expr
