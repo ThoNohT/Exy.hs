@@ -12,6 +12,7 @@ import Exy
     Output (..),
     Statement (..),
     Variable (Variable),
+    clearDeclaration,
     createDeclaration,
     dependencies,
     insertDependencies,
@@ -51,10 +52,6 @@ storeVar var expr state =
   Map.insert var (createDeclaration var state expr) $
     insertDependencies var (dependencies expr) state
 
--- | Removes a variable from the state, has no effect if the variable did not exist.
-clearVar :: Variable -> ExyState -> ExyState
-clearVar = Map.delete
-
 -- | A single step in the Exy update loop.
 step :: StateT ExyState IO Output
 step = do
@@ -74,7 +71,7 @@ step = do
           put newState
           liftIO $ showVar var newState
         Clear var -> do
-          modify (clearVar var)
+          modify (clearDeclaration var)
           liftIO $ putStrLn "Cleared"
     Left err -> liftIO $ putStrLn $ T.unpack err
 

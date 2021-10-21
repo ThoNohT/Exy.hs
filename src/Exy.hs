@@ -1,6 +1,7 @@
 module Exy
   ( ShowExpr,
     showExpr,
+    clearDeclaration,
     insertDependencies,
     dependencies,
     ExyState,
@@ -71,6 +72,15 @@ createDeclaration var state expr =
       declType = expressionType state expr,
       declDependents = maybe Set.empty declDependents (Map.lookup var state)
     }
+
+-- | Clears a declaration for a varable.
+clearDeclaration :: Variable -> ExyState -> ExyState
+clearDeclaration var state =
+  case Map.lookup var state of
+    Just DeclaredDeclaration {declDependents = dd} | Set.null dd -> Map.delete var state
+    Just DeclaredDeclaration {declDependents = dd} ->
+      Map.insert var (UndeclaredDeclaration {declDependents = dd}) state
+    _ -> state
 
 -- Type checking
 
