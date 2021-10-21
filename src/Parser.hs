@@ -10,12 +10,12 @@ import Data.Functor ((<&>))
 import qualified Data.List as List
 import Data.Set (Set)
 import qualified Data.Set as Set (fromList, member)
+import Data.Text (toLower)
 import qualified Data.Text as T
 import Exy (Expression (..), Operator (..), Primitive (..), Statement (..), Variable (Variable))
 import qualified GHC.TypeLits as T
 import Lexer (LexInfo (..), Token (..))
 import Text.Printf (printf)
-import Data.Text (toLower)
 
 -- ##### ##### ##### ##### ##### ##### ##### ##### ##### ##### --
 
@@ -155,7 +155,14 @@ keywords :: Set T.Text
 keywords = Set.fromList ["store", "load", "clear", "yes", "no"]
 
 keyword :: Parser T.Text
-keyword = wordToken & check (\w -> if Set.member (toLower $ tkn w) keywords then Right (tkn w) else Left "Word is not a keyword")
+keyword =
+  wordToken
+    & check
+      ( \w ->
+          if Set.member (toLower $ tkn w) keywords
+            then Right (tkn w)
+            else Left $ T.pack $ printf "Word '%s' is not a keyword" (tkn w)
+      )
 
 bracket :: T.Text -> Parser ()
 bracket str =
