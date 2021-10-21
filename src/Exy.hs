@@ -1,6 +1,8 @@
 module Exy
   ( ShowExpr,
     showExpr,
+    insertDependencies,
+    dependencies,
     ExyState,
     Output (..),
     Primitive (..),
@@ -33,22 +35,44 @@ data Output = Continue | Quit deriving (Eq)
 
 type ExyState = Map Variable Declaration
 
-data DeclarationError
-  = ParseError T.Text
-  | TypeError T.Text
+-- | Specifies that variable `var` is dependent on all variables in `deps`.
+-- The state is updated to add `var` as a dependency to all variables already in the state. If a variable
+-- is not yet in the state, it is added as an `UndeclaredDeclaration` with this variable as dependency.
+insertDependencies :: Variable -> Set Variable -> ExyState -> ExyState
+insertDependencies var deps state = Set.fold injectDep state deps
+  where
+    injectDep :: Variable -> ExyState -> ExyState
+    injectDep dep state =
+      case Map.lookup dep state of
+        Nothing -> Map.insert dep (UndeclaredDeclaration {declDependents = Set.singleton var}) state
+        Just decl -> Map.insert var (registerDependency var decl) state
 
--- TODO: Store dependent variables so we can store computed values and update all dependencies.
-data Declaration = Declaration
-  { declExpr :: Expression,
-    declType :: Either T.Text Type
-  }
+-- TODO: Store computed values and update them when triggered by a dependency.
+data Declaration
+  = UndeclaredDeclaration {declDependents :: Set Variable}
+  | DeclaredDeclaration
+      { declExpr :: Expression,
+        declType :: Either T.Text Type,
+        declDependents :: Set Variable
+      }
 
-createDeclaration :: ExyState -> Expression -> Declaration
-createDeclaration state expr =
-  Declaration
+-- | Registers a variable as a dependency with a declaration.
+registerDependency :: Variable -> Declaration -> Declaration
+registerDependency dependent = \case
+  d@UndeclaredDeclaration {declDependents = dd} -> d {declDependents = Set.insert dependent dd}
+  d@DeclaredDeclaration {declDependents = dd} -> d {declDependents = Set.insert dependent dd}
+
+-- | Creates a new declaration for a variable and expression given a state.
+-- If the declaration already exists in the sate, its depenencies are copied.
+createDeclaration :: Variable -> ExyState -> Expression -> Declaration
+createDeclaration var state expr =
+  DeclaredDeclaration
     { declExpr = expr,
-      declType = expressionType state expr
+      declType = expressionType state expr,
+      declDependents = maybe Set.empty declDependents (Map.lookup var state)
     }
+
+-- Type checking
 
 data Type = TypeNumber | TypeTruth deriving (Eq, Ord)
 
@@ -82,7 +106,7 @@ operatorTypeMap =
     ]
 
 variableType :: ExyState -> Variable -> Maybe Type
-variableType state var = ( rightToMaybe . declType ) =<< Map.lookup var state
+variableType state var = (rightToMaybe . declType) =<< Map.lookup var state
 
 primitiveType :: Primitive -> Type
 primitiveType (Number _) = TypeNumber
@@ -122,6 +146,13 @@ data Expression
   | BinaryExpression Operator Expression Expression
   | GroupedExpression Expression
   deriving (Show)
+
+-- | Returns all variables on which the specified expression depends.
+dependencies :: Expression -> Set Variable
+dependencies (PrimitiveExpression _) = Set.empty
+dependencies (VariableReference v) = Set.singleton v
+dependencies (BinaryExpression _ l r) = Set.union (dependencies l) (dependencies r)
+dependencies (GroupedExpression e) = dependencies e
 
 instance ShowExpr Expression where
   showExpr (PrimitiveExpression p) = showExpr p
