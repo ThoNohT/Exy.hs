@@ -59,7 +59,7 @@ instance Show Type where
 expressionType :: ExyState -> Expression -> Either T.Text Type
 expressionType _ (PrimitiveExpression p) = Right $ primitiveType p
 expressionType state (VariableReference v) =
-  maybeToRight (T.pack $ printf "Could not determine type of variable '%s'" (show v)) $ variableType state v
+  maybeToRight (T.pack $ printf "Could not determine type of variable '%s'" (showExpr v)) $ variableType state v
 expressionType state (GroupedExpression e) = expressionType state e
 expressionType state ex@(BinaryExpression op l r) =
   case (expressionType state l, expressionType state r) of

@@ -15,6 +15,7 @@ import Exy (Expression (..), Operator (..), Primitive (..), Statement (..), Vari
 import qualified GHC.TypeLits as T
 import Lexer (LexInfo (..), Token (..))
 import Text.Printf (printf)
+import Data.Text (toLower)
 
 -- ##### ##### ##### ##### ##### ##### ##### ##### ##### ##### --
 
@@ -154,7 +155,7 @@ keywords :: Set T.Text
 keywords = Set.fromList ["store", "load", "clear", "yes", "no"]
 
 keyword :: Parser T.Text
-keyword = wordToken & check (\w -> if Set.member (tkn w) keywords then Right (tkn w) else Left "Word is not a keyword")
+keyword = wordToken & check (\w -> if Set.member (toLower $ tkn w) keywords then Right (tkn w) else Left "Word is not a keyword")
 
 bracket :: T.Text -> Parser ()
 bracket str =
@@ -181,7 +182,7 @@ pKeyword name =
   keyword
     & check
       ( \w ->
-          if w == name
+          if toLower w == toLower name
             then Right w
             else Left $ T.pack $ printf "Expected '%s' keyword but got '%s'." name w
       )
