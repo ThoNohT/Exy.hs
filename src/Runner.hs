@@ -45,10 +45,13 @@ showVar var state = do
       liftIO $ case declType decl of
         Left err -> putStrLn $ printf "Type Error: %s" err
         Right t -> putStrLn $ printf "Type: %s" $ show t
+      liftIO $ putStrLn "Dependents:"
+      liftIO $ print $ declDependents decl
     Just decl@UndeclaredDeclaration {} ->
       putStrLn "Undeclared declaration."
 
--- | Stores a variable with an expression in the state.
+-- | Stores a variable with an expression in the state, and recalculates the state to update all declarations
+-- depending on this declaration.
 -- Overrides any older declaration for this variable.
 storeVar :: Variable -> Expression -> ExyState -> IO ExyState
 storeVar var expr state =
@@ -58,10 +61,16 @@ storeVar var expr state =
       pure $
         recalculateState (Set.singleton var) $
           Map.insert var (createDeclaration var state expr) $
+            -- TODO: Something is going wrong when storing dependencies.
             insertDependencies var (dependencies expr) state
     _ -> do
       putStrLn $ printf "Storing expression: %s would introduce a circular dependency." (showExpr expr)
       pure state
+
+-- | Clears the declaration with the specified variable from the state, and recalculates the state to update all
+-- declarations depending on this declaration.
+clearVar :: Variable -> ExyState -> ExyState
+clearVar var state = recalculateState (Set.singleton var) $ clearDeclaration var state
 
 -- | A single step in the Exy update loop.
 step :: StateT ExyState IO Output
@@ -82,7 +91,7 @@ step = do
           put newState
           liftIO $ showVar var newState
         Clear var -> do
-          modify (clearDeclaration var)
+          modify (clearVar var)
           liftIO $ putStrLn "Cleared"
     Left err -> liftIO $ putStrLn $ T.unpack err
 
