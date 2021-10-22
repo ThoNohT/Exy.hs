@@ -56,18 +56,22 @@ insertDependencies var deps state = Set.fold injectDep state deps
 recalculateState :: Set Variable -> ExyState -> ExyState
 recalculateState vars state =
   let toUpdate = Set.unions $ declDependents <$> mapMaybe (`Map.lookup` state) (Set.toList vars)
-      recalculateDecl st var =
+      recalculateDecl (st, next) var =
         case Map.lookup var st of
-          Nothing -> st
+          Nothing -> (st, next)
           Just decl ->
             case tryDeclExpr decl of
               Just expr ->
-                Map.insert var (decl {declType = expressionType st expr}) st
+                ( Map.insert var (decl {declType = expressionType st expr}) st,
+                  -- The next iteration only has to perform something if an actually declared variable with expression
+                  -- was updated.
+                  Set.insert var next
+                )
               Nothing ->
-                st
+                (st, next)
    in if Set.null toUpdate
         then state
-        else recalculateState toUpdate $ foldl recalculateDecl state toUpdate
+        else (\(newSt, next) -> recalculateState next newSt) $ foldl recalculateDecl (state, Set.empty) toUpdate
 
 -- TODO: Store computed values and update them when triggered by a dependency.
 data Declaration
