@@ -11,6 +11,7 @@ fst3 (a, _, _) = a
 filterMaybe :: (a -> Bool) -> Maybe a -> Maybe a
 filterMaybe predicate maybe = maybe >>= (\v -> if predicate v then Just v else Nothing)
 
-setFromMaybe :: Maybe a -> Set a
+-- | Creates a set from a Maybe, either a singleton set if Just, or empty set if Nothing.
+setFromMaybe :: forall a. Ord a => Maybe a -> Set a
 setFromMaybe Nothing = Set.empty
 setFromMaybe (Just a) = Set.singleton a

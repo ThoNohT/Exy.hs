@@ -4,6 +4,7 @@ module Exy
     clearDeclaration,
     insertDependencies,
     dependencies,
+    allDependencies,
     ExyState,
     Output (..),
     Primitive (..),
@@ -22,7 +23,7 @@ import Data.Either.Combinators (maybeToRight, rightToMaybe)
 import qualified Data.List as List
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
-import Data.Set (Set)
+import Data.Set (Set, (\\))
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import Text.Printf (printf)
@@ -56,6 +57,18 @@ data Declaration
         declType :: Either T.Text Type,
         declDependents :: Set Variable
       }
+
+-- | Attempts to get the expression of a declaration. Returns None if no expression is declared.
+tryDeclExpr :: Declaration -> Maybe Expression
+tryDeclExpr = \case
+  DeclaredDeclaration {declExpr = e} -> Just e
+  _ -> Nothing
+
+-- | Attempts to get the type of a declaration. Returns None if no expression is declared.
+tryDecltype :: Declaration -> Maybe Type
+tryDecltype = \case
+  DeclaredDeclaration {declType = t} -> rightToMaybe t
+  _ -> Nothing
 
 -- | Registers a variable as a dependency with a declaration.
 registerDependency :: Variable -> Declaration -> Declaration
@@ -116,7 +129,7 @@ operatorTypeMap =
     ]
 
 variableType :: ExyState -> Variable -> Maybe Type
-variableType state var = (rightToMaybe . declType) =<< Map.lookup var state
+variableType state var = tryDecltype =<< Map.lookup var state
 
 primitiveType :: Primitive -> Type
 primitiveType (Number _) = TypeNumber
@@ -157,12 +170,32 @@ data Expression
   | GroupedExpression Expression
   deriving (Show)
 
--- | Returns all variables on which the specified expression depends.
+-- | Returns all variables on which the specified expression directly depends.
 dependencies :: Expression -> Set Variable
 dependencies (PrimitiveExpression _) = Set.empty
 dependencies (VariableReference v) = Set.singleton v
 dependencies (BinaryExpression _ l r) = Set.union (dependencies l) (dependencies r)
 dependencies (GroupedExpression e) = dependencies e
+
+-- | Returns all dependencies on which the specified expression depends either direcly or indirectly.
+-- Assumes there are no circular dependencies.
+allDependencies :: ExyState -> Expression -> Set Variable
+allDependencies state expr =
+  let -- Returns an empty set of dependencies if the variable has no declared expression.
+      dependenciesForVariable var = maybe Set.empty dependencies (tryDeclExpr =<< Map.lookup var state)
+      directDependencies = dependencies expr
+
+      step :: Set Variable -> Set Variable -> Set Variable
+      step all new =
+        if Set.null new
+          then -- No new dependencies, so we are done expanding.
+            all
+          else -- There are new dependencies, add them.
+          -- But only mark those as new that we haven't seen before.
+
+            let newDeps = Set.unions $ Set.map dependenciesForVariable new
+             in step (Set.union all newDeps) (newDeps \\ all)
+   in step directDependencies directDependencies
 
 instance ShowExpr Expression where
   showExpr (PrimitiveExpression p) = showExpr p

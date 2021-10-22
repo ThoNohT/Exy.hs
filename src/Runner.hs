@@ -3,6 +3,7 @@ module Runner (run) where
 import Control.Monad (foldM_)
 import Control.Monad.RWS.Lazy (modify)
 import Control.Monad.State.Lazy (MonadIO (liftIO), MonadState (get, put), StateT (runStateT))
+import Data.Set as Set
 import Data.Map.Strict as Map
 import qualified Data.Text as T
 import Exy
@@ -12,6 +13,7 @@ import Exy
     Output (..),
     Statement (..),
     Variable (Variable),
+    allDependencies,
     clearDeclaration,
     createDeclaration,
     dependencies,
@@ -47,10 +49,17 @@ showVar var state = do
 
 -- | Stores a variable with an expression in the state.
 -- Overrides any older declaration for this variable.
-storeVar :: Variable -> Expression -> ExyState -> ExyState
+storeVar :: Variable -> Expression -> ExyState -> IO ExyState
 storeVar var expr state =
-  Map.insert var (createDeclaration var state expr) $
-    insertDependencies var (dependencies expr) state
+  case allDependencies state expr of
+    deps | not $ Set.member var deps -> do
+      -- Ok, we can insert.
+      pure $
+        Map.insert var (createDeclaration var state expr) $
+          insertDependencies var (dependencies expr) state
+    _ -> do
+      putStrLn $ printf "Storing expression: %s would introduce a circular dependency." (showExpr expr)
+      pure state
 
 -- | A single step in the Exy update loop.
 step :: StateT ExyState IO Output
@@ -67,7 +76,7 @@ step = do
           get >>= liftIO . showVar var
         Store var expr -> do
           state <- get
-          let newState = storeVar var expr state
+          newState <- liftIO $ storeVar var expr state
           put newState
           liftIO $ showVar var newState
         Clear var -> do
