@@ -65,8 +65,9 @@ recalculateState vars state =
                 Map.insert var (decl {declType = expressionType st expr}) st
               Nothing ->
                 st
-   in -- TODO: This only does one step, but we need it to recurse until there is nothing more to update.
-      foldl recalculateDecl state toUpdate
+   in if Set.null toUpdate
+        then state
+        else recalculateState toUpdate $ foldl recalculateDecl state toUpdate
 
 -- TODO: Store computed values and update them when triggered by a dependency.
 data Declaration
