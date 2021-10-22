@@ -5,6 +5,7 @@ module Exy
     insertDependencies,
     dependencies,
     allDependencies,
+    recalculateState,
     ExyState,
     Output (..),
     Primitive (..),
@@ -23,6 +24,7 @@ import Data.Either.Combinators (maybeToRight, rightToMaybe)
 import qualified Data.List as List
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import Data.Maybe (mapMaybe)
 import Data.Set (Set, (\\))
 import qualified Data.Set as Set
 import qualified Data.Text as T
@@ -48,6 +50,23 @@ insertDependencies var deps state = Set.fold injectDep state deps
       case Map.lookup dep state of
         Nothing -> Map.insert dep (UndeclaredDeclaration {declDependents = Set.singleton var}) state
         Just decl -> Map.insert var (registerDependency var decl) state
+
+-- | Recalculates the state, given that the provided variables were just inserted or updated.
+-- All declarations that depend on this variable are updated, and they in turn trigger the recalculation.
+recalculateState :: Set Variable -> ExyState -> ExyState
+recalculateState vars state =
+  let toUpdate = Set.unions $ declDependents <$> mapMaybe (`Map.lookup` state) (Set.toList vars)
+      recalculateDecl st var =
+        case Map.lookup var st of
+          Nothing -> st
+          Just decl ->
+            case tryDeclExpr decl of
+              Just expr ->
+                Map.insert var (decl {declType = expressionType st expr}) st
+              Nothing ->
+                st
+   in -- TODO: This only does one step, but we need it to recurse until there is nothing more to update.
+      foldl recalculateDecl state toUpdate
 
 -- TODO: Store computed values and update them when triggered by a dependency.
 data Declaration
@@ -178,7 +197,7 @@ dependencies (BinaryExpression _ l r) = Set.union (dependencies l) (dependencies
 dependencies (GroupedExpression e) = dependencies e
 
 -- | Returns all dependencies on which the specified expression depends either direcly or indirectly.
--- Assumes there are no circular dependencies.
+-- Circular dependencies are only reported once (but make sure they don't exist anyway).
 allDependencies :: ExyState -> Expression -> Set Variable
 allDependencies state expr =
   let -- Returns an empty set of dependencies if the variable has no declared expression.

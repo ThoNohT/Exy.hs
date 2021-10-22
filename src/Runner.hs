@@ -3,8 +3,8 @@ module Runner (run) where
 import Control.Monad (foldM_)
 import Control.Monad.RWS.Lazy (modify)
 import Control.Monad.State.Lazy (MonadIO (liftIO), MonadState (get, put), StateT (runStateT))
-import Data.Set as Set
 import Data.Map.Strict as Map
+import Data.Set as Set
 import qualified Data.Text as T
 import Exy
   ( Declaration (..),
@@ -18,6 +18,7 @@ import Exy
     createDeclaration,
     dependencies,
     insertDependencies,
+    recalculateState,
     showExpr,
   )
 import Lexer (lexText)
@@ -55,8 +56,9 @@ storeVar var expr state =
     deps | not $ Set.member var deps -> do
       -- Ok, we can insert.
       pure $
-        Map.insert var (createDeclaration var state expr) $
-          insertDependencies var (dependencies expr) state
+        recalculateState (Set.singleton var) $
+          Map.insert var (createDeclaration var state expr) $
+            insertDependencies var (dependencies expr) state
     _ -> do
       putStrLn $ printf "Storing expression: %s would introduce a circular dependency." (showExpr expr)
       pure state
