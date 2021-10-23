@@ -48,10 +48,10 @@ showVar var state = do
       case declValue decl of
         Nothing -> putStrLn "No value known"
         Just v -> putStrLn $ printf "Value: %s" (show v)
-      putStrLn $ printf "Dependents: %s" (show $ declDependents decl)
+      putStrLn $ printf "Dependents: %s" (T.intercalate ", " $ showExpr <$> Set.toList (declDependents decl))
     Just decl@UndeclaredDeclaration {} -> do
       putStrLn "Undeclared declaration."
-      putStrLn $ printf "Dependents: %s" (show $ declDependents decl)
+      putStrLn $ printf "Dependents: %s" (T.intercalate ", " $ showExpr <$> Set.toList (declDependents decl))
 
 -- | Stores a variable with an expression in the state, and recalculates the state to update all declarations
 -- depending on this declaration.
