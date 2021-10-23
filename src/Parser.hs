@@ -19,31 +19,34 @@ import Text.Printf (printf)
 
 -- ##### ##### ##### ##### ##### ##### ##### ##### ##### ##### --
 
-newtype Parser a = Parser {runParser :: [LexInfo Token] -> Either T.Text (a, [LexInfo Token])}
+data Parser a = Parser {committed :: Bool, runParser :: [LexInfo Token] -> Either T.Text (a, [LexInfo Token])}
+
+mkParser :: ([LexInfo Token] -> Either T.Text (a, [LexInfo Token])) -> Parser a
+mkParser f = Parser { committed = False, runParser = f }
 
 instance Functor Parser where
-  fmap f (Parser p) = Parser (fmap (first f) . p)
+  fmap f (Parser _ p) = mkParser (fmap (first f) . p)
 
 instance Applicative Parser where
-  pure a = Parser $ \x -> Right (a, x)
-  Parser pf <*> Parser pb = Parser $ pf >=> (\(f, rest1) -> fmap (first f) (pb rest1))
+  pure a = mkParser $ \x -> Right (a, x)
+  Parser _ pf <*> Parser _ pb = mkParser $ pf >=> (\(f, rest1) -> fmap (first f) (pb rest1))
 
 instance Alternative Parser where
-  empty = Parser $ const $ Left ""
-  Parser pa <|> Parser pb = Parser $ \input -> case pa input of
+  empty = mkParser $ const $ Left ""
+  Parser _ pa <|> Parser _ pb = mkParser $ \input -> case pa input of
     Right result -> Right result
     Left leftErr -> case pb input of
       Right result -> Right result
       Left _ -> Left leftErr
 
 instance Monad Parser where
-  Parser pa >>= f = Parser $ pa >=> (\(a, rest1) -> runParser (f a) rest1)
+  Parser _ pa >>= f = mkParser $ pa >=> (\(a, rest1) -> runParser (f a) rest1)
 
 -- ##### ##### ##### ##### ##### ##### ##### ##### ##### ##### --
 
 -- | A parser that consumes a token, and fails if there is no token left.
 token :: Parser (LexInfo Token)
-token = Parser $ \case
+token = mkParser $ \case
   [] -> Left "No more input."
   tkn : rest -> Right (tkn, rest)
 
@@ -53,7 +56,7 @@ token = Parser $ \case
 check :: (a -> Either T.Text b) -> Parser a -> Parser b
 check checkFn p = p >>= checkParser
   where
-    checkParser v = Parser $ \input -> case checkFn v of
+    checkParser v = mkParser $ \input -> case checkFn v of
       Right e -> Right (e, input)
       Left r -> Left r
 
@@ -105,7 +108,7 @@ bracketToken =
 
 -- | A parser that succeeds only if there is no more input to consume.
 end :: Parser ()
-end = Parser $ \case
+end = mkParser $ \case
   [] -> Right ((), [])
   _ -> Left "Expected end of input."
 
