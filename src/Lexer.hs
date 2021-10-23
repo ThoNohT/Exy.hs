@@ -2,7 +2,7 @@ module Lexer (Token (..), LexInfo (..), lexText) where
 
 import Control.Applicative (Alternative, empty, (<|>))
 import Control.Monad ((>=>))
-import Core (filterMaybe, fst3)
+import Core (filterMaybe)
 import Data.Bifunctor (first)
 import Data.Char (isDigit, isLetter, isSpace)
 import Data.Functor ((<&>))
@@ -95,7 +95,7 @@ token =
 
 -- ##### ##### ##### ##### ##### ##### ##### ##### ##### ##### --
 
-data LexInfo a = LexInfo {tkn :: a, whitespaceBefore :: Bool} deriving (Show)
+data LexInfo a = LexInfo {tkn :: a, whitespaceBefore :: Bool} deriving (Show, Eq)
 
 lexText :: T.Text -> Either T.Text [LexInfo Token]
 lexText input =

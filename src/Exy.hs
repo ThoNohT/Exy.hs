@@ -18,7 +18,6 @@ module Exy
   )
 where
 
-import Core (setFromMaybe)
 import Data.Either.Combinators (maybeToRight, rightToMaybe)
 import qualified Data.List as List
 import Data.Map.Strict (Map)
@@ -224,7 +223,7 @@ primitiveValue (Truth t) = TruthValue t
 data Primitive
   = Number Integer
   | Truth Bool
-  deriving (Show)
+  deriving (Show, Eq)
 
 instance ShowExpr Primitive where
   showExpr (Number n) = T.pack $ show n
@@ -252,7 +251,7 @@ data Expression
   | VariableReference Variable
   | BinaryExpression Operator Expression Expression
   | GroupedExpression Expression
-  deriving (Show)
+  deriving (Show, Eq)
 
 -- | Returns all variables on which the specified expression directly depends.
 dependencies :: Expression -> Set Variable

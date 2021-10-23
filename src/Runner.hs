@@ -21,9 +21,9 @@ import Exy
     showExpr,
   )
 import Lexer (lexText)
-import Parser (Parser, end, runParser, statement)
-import Text.Printf (printf)
+import Parser (Parser, end, runParser', statement)
 import System.IO (hFlush, stdout)
+import Text.Printf (printf)
 
 -- | Runs the Exy update loop.
 run :: IO ()
@@ -31,7 +31,7 @@ run = run' Map.empty
   where
     run' st = do
       (continue, st') <- runStateT step st
-      if continue then  run' st' else pure ()
+      if continue then run' st' else pure ()
 
 -- | Displays all information about a variable, given the provided state.
 showVar :: Variable -> ExyState -> IO ()
@@ -81,7 +81,7 @@ step = do
   liftIO $ hFlush stdout
   input <- T.pack <$> liftIO getLine
 
-  let parsed = runParser (statement <* end) =<< lexText input
+  let parsed = runParser' (statement <* end) =<< lexText input
 
   case parsed of
     Right (stmt, _) -> do
@@ -101,6 +101,5 @@ step = do
           pure True
         Quit -> pure False
     Left err -> do
-        liftIO $ putStrLn $ T.unpack err
-        pure True
-
+      liftIO $ putStrLn $ printf "Parse error: %s" err
+      pure True

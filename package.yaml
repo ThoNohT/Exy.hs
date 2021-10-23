@@ -29,6 +29,9 @@ library:
     - containers
     - either
     - directory
+    # Apparently hls doesn't know we're looking at tests, so add all test dependencies below here too...
+    - tasty
+    - tasty-hunit
   default-extensions:
     - GADTs
     - LambdaCase
@@ -43,13 +46,41 @@ library:
     - FlexibleInstances
     - FlexibleContexts
     - GeneralizedNewtypeDeriving
+
 executables:
   exy:
-    main:                Main.hs
-    source-dirs:         app
+    main: Main.hs
+    source-dirs: app
     ghc-options:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
     - exy
+
+tests:
+  exy-test:
+    main: Main.hs
+    source-dirs: test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - exy
+    - tasty
+    - tasty-hunit
+    default-extensions:
+    - GADTs
+    - LambdaCase
+    - StandaloneDeriving
+    - OverloadedStrings
+    - ScopedTypeVariables
+    - TypeApplications
+    - RankNTypes
+    - ExplicitForAll
+    - DataKinds
+    - TypeFamilies
+    - FlexibleInstances
+    - FlexibleContexts
+    - GeneralizedNewtypeDeriving
