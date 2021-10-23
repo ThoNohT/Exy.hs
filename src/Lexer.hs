@@ -101,7 +101,7 @@ lexText :: T.Text -> Either T.Text [LexInfo Token]
 lexText input =
   let wrapToken :: Bool -> Token -> LexInfo Token
       wrapToken hasWs tkn = LexInfo {tkn = tkn, whitespaceBefore = hasWs}
-   in case (input, runLexer ((,) <$> (True <$ whitespace <|> pure False) <*> token) input) of
+   in case (T.strip input, runLexer ((,) <$> (True <$ whitespace <|> pure False) <*> token) input) of
         ("", _) -> Right []
         (_, Just ((hasWs, tok), rest)) -> fmap (wrapToken hasWs tok :) (lexText rest)
         _ -> Left $ T.pack $ printf "Failed lexing with remaining input: '%s'" input
