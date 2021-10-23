@@ -24,6 +24,7 @@ import Exy
 import Lexer (lexText)
 import Parser (Parser, end, runParser, statement)
 import Text.Printf (printf)
+import System.IO (hFlush, stdout)
 
 -- | Runs the Exy update loop.
 run :: IO ()
@@ -77,7 +78,8 @@ clearVar var state = recalculateState (Set.singleton var) $ clearDeclaration var
 -- | A single step in the Exy update loop.
 step :: StateT ExyState IO Output
 step = do
-  liftIO $ putStrLn "Type something..."
+  liftIO $ putStr "Exy> "
+  liftIO $ hFlush stdout
   input <- T.pack <$> liftIO getLine
 
   let parsed = runParser (statement <* end) =<< lexText input
