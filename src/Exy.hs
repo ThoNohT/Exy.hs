@@ -7,7 +7,6 @@ module Exy
     allDependencies,
     recalculateState,
     ExyState,
-    Output (..),
     Primitive (..),
     Operator (..),
     Variable (..),
@@ -34,8 +33,6 @@ class ShowExpr a where
   showExpr :: a -> T.Text
 
 -- Interaction
-
-data Output = Continue | Quit deriving (Eq)
 
 type ExyState = Map Variable Declaration
 
@@ -294,4 +291,5 @@ data Statement
   = Store Variable Expression
   | Load Variable
   | Clear Variable
+  | Quit
   deriving (Show)

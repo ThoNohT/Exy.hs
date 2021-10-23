@@ -152,7 +152,7 @@ primitive = Number <$> number <|> Truth <$> truth
           )
 
 keywords :: Set T.Text
-keywords = Set.fromList ["store", "load", "clear", "yes", "no"]
+keywords = Set.fromList ["quit", "store", "load", "clear", "yes", "no"]
 
 keyword :: Parser T.Text
 keyword =
@@ -206,8 +206,9 @@ expression descend = if descend then binary <|> nonDescending else nonDescending
     var = VariableReference <$> variable
 
 statement :: Parser Statement
-statement = store <|> load <|> clear
+statement = quit <|> store <|> load <|> clear
   where
+    quit = Quit <$ pKeyword "quit"
     load = Load <$> (pKeyword "load" *> variable)
     clear = Clear <$> (pKeyword "clear" *> variable)
     store = Store <$> (pKeyword "store" *> variable) <*> expression True

@@ -10,7 +10,6 @@ import Exy
   ( Declaration (..),
     Expression,
     ExyState,
-    Output (..),
     Statement (..),
     Variable (Variable),
     allDependencies,
@@ -31,8 +30,8 @@ run :: IO ()
 run = run' Map.empty
   where
     run' st = do
-      (out, st') <- runStateT step st
-      if out == Quit then pure () else run' st'
+      (continue, st') <- runStateT step st
+      if continue then  run' st' else pure ()
 
 -- | Displays all information about a variable, given the provided state.
 showVar :: Variable -> ExyState -> IO ()
@@ -76,7 +75,7 @@ clearVar :: Variable -> ExyState -> ExyState
 clearVar var state = recalculateState (Set.singleton var) $ clearDeclaration var $ setDependencies var Set.empty state
 
 -- | A single step in the Exy update loop.
-step :: StateT ExyState IO Output
+step :: StateT ExyState IO Bool
 step = do
   liftIO $ putStr "Exy> "
   liftIO $ hFlush stdout
@@ -87,18 +86,21 @@ step = do
   case parsed of
     Right (stmt, _) -> do
       case stmt of
-        Load var ->
+        Load var -> do
           get >>= liftIO . showVar var
+          pure True
         Store var expr -> do
           state <- get
           newState <- liftIO $ storeVar var expr state
           put newState
           liftIO $ showVar var newState
+          pure True
         Clear var -> do
           modify (clearVar var)
           liftIO $ putStrLn "Cleared"
-    Left err -> liftIO $ putStrLn $ T.unpack err
+          pure True
+        Quit -> pure False
+    Left err -> do
+        liftIO $ putStrLn $ T.unpack err
+        pure True
 
-  case input of
-    "quit" -> pure Quit
-    _ -> pure Continue
