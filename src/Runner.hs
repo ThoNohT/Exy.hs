@@ -17,8 +17,8 @@ import Exy
     clearDeclaration,
     createDeclaration,
     dependencies,
-    insertDependencies,
     recalculateState,
+    setDependencies,
     showExpr,
   )
 import Lexer (lexText)
@@ -41,14 +41,16 @@ showVar var state = do
   case val of
     Nothing -> liftIO $ putStrLn "Variable declaration not found"
     Just decl@DeclaredDeclaration {} -> do
-      liftIO $ putStrLn $ printf "Expression: %s" (showExpr (declExpr decl))
-      liftIO $ case declType decl of
+      putStrLn $ printf "Expression: %s" (showExpr (declExpr decl))
+      case declType decl of
         Left err -> putStrLn $ printf "Type Error: %s" err
         Right t -> putStrLn $ printf "Type: %s" $ show t
       liftIO $ putStrLn "Dependents:"
       liftIO $ print $ declDependents decl
-    Just decl@UndeclaredDeclaration {} ->
+    Just decl@UndeclaredDeclaration {} -> do
       putStrLn "Undeclared declaration."
+      putStrLn "Dependents:"
+      print $ declDependents decl
 
 -- | Stores a variable with an expression in the state, and recalculates the state to update all declarations
 -- depending on this declaration.
@@ -61,8 +63,7 @@ storeVar var expr state =
       pure $
         recalculateState (Set.singleton var) $
           Map.insert var (createDeclaration var state expr) $
-            -- TODO: Something is going wrong when storing dependencies.
-            insertDependencies var (dependencies expr) state
+            setDependencies var (dependencies expr) state
     _ -> do
       putStrLn $ printf "Storing expression: %s would introduce a circular dependency." (showExpr expr)
       pure state
@@ -70,7 +71,7 @@ storeVar var expr state =
 -- | Clears the declaration with the specified variable from the state, and recalculates the state to update all
 -- declarations depending on this declaration.
 clearVar :: Variable -> ExyState -> ExyState
-clearVar var state = recalculateState (Set.singleton var) $ clearDeclaration var state
+clearVar var state = recalculateState (Set.singleton var) $ clearDeclaration var $ setDependencies var Set.empty state
 
 -- | A single step in the Exy update loop.
 step :: StateT ExyState IO Output

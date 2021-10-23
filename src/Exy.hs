@@ -2,7 +2,7 @@ module Exy
   ( ShowExpr,
     showExpr,
     clearDeclaration,
-    insertDependencies,
+    setDependencies,
     dependencies,
     allDependencies,
     recalculateState,
@@ -42,14 +42,22 @@ type ExyState = Map Variable Declaration
 -- | Specifies that variable `var` is dependent on all variables in `deps`.
 -- The state is updated to add `var` as a dependency to all variables already in the state. If a variable
 -- is not yet in the state, it is added as an `UndeclaredDeclaration` with this variable as dependency.
-insertDependencies :: Variable -> Set Variable -> ExyState -> ExyState
-insertDependencies var deps state = Set.fold injectDep state deps
+-- Any declarations that have the `var` as a dependency but are not in `deps` have `a` cleared.
+setDependencies :: Variable -> Set Variable -> ExyState -> ExyState
+setDependencies var deps state = Set.fold injectDep updatedState deps
   where
-    injectDep :: Variable -> ExyState -> ExyState
+    updatedState = Map.mapMaybeWithKey setDep state
+
+    setDep declVar decl =
+      case (Set.member declVar deps, Set.member var $ declDependents decl) of
+        (True, False) -> Just $ registerDependency var decl
+        (False, True) -> unregisterDependency var decl
+        _ -> Just decl
+
     injectDep dep state =
       case Map.lookup dep state of
         Nothing -> Map.insert dep (UndeclaredDeclaration {declDependents = Set.singleton var}) state
-        Just decl -> Map.insert var (registerDependency var decl) state
+        _ -> state
 
 -- | Recalculates the state, given that the provided variables were just inserted or updated.
 -- All declarations that depend on this variable are updated, and they in turn trigger the recalculation.
@@ -99,6 +107,16 @@ registerDependency :: Variable -> Declaration -> Declaration
 registerDependency dependent = \case
   d@UndeclaredDeclaration {declDependents = dd} -> d {declDependents = Set.insert dependent dd}
   d@DeclaredDeclaration {declDependents = dd} -> d {declDependents = Set.insert dependent dd}
+
+-- | Unregisters a variable as a dependency with a declaration. If the declaration is unregistered, and has no
+-- dependencies left, Nothing is returned.
+unregisterDependency :: Variable -> Declaration -> Maybe Declaration
+unregisterDependency dependent = \case
+  d@UndeclaredDeclaration {declDependents = dd} ->
+    case Set.size dd of
+      1 -> Nothing
+      _ -> Just d {declDependents = Set.delete dependent dd}
+  d@DeclaredDeclaration {declDependents = dd} -> Just d {declDependents = Set.delete dependent dd}
 
 -- | Creates a new declaration for a variable and expression given a state.
 -- If the declaration already exists in the sate, its depenencies are copied.
