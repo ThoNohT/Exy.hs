@@ -39,18 +39,19 @@ showVar var state = do
   putStrLn $ printf "===== [ %s ] =====" (showExpr var)
   let val = Map.lookup var state
   case val of
-    Nothing -> liftIO $ putStrLn "Variable declaration not found"
+    Nothing -> putStrLn "Variable declaration not found"
     Just decl@DeclaredDeclaration {} -> do
       putStrLn $ printf "Expression: %s" (showExpr (declExpr decl))
       case declType decl of
         Left err -> putStrLn $ printf "Type Error: %s" err
         Right t -> putStrLn $ printf "Type: %s" $ show t
-      liftIO $ putStrLn "Dependents:"
-      liftIO $ print $ declDependents decl
+      case declValue decl of
+        Nothing -> putStrLn "No value known"
+        Just v -> putStrLn $ printf "Value: %s" (show v)
+      putStrLn $ printf "Dependents: %s" (show $ declDependents decl)
     Just decl@UndeclaredDeclaration {} -> do
       putStrLn "Undeclared declaration."
-      putStrLn "Dependents:"
-      print $ declDependents decl
+      putStrLn $ printf "Dependents: %s" (show $ declDependents decl)
 
 -- | Stores a variable with an expression in the state, and recalculates the state to update all declarations
 -- depending on this declaration.

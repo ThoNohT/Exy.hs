@@ -70,7 +70,7 @@ recalculateState vars state =
           Just decl ->
             case tryDeclExpr decl of
               Just expr ->
-                ( Map.insert var (decl {declType = expressionType st expr}) st,
+                ( Map.insert var (decl {declType = expressionType st expr, declValue = expressionValue st expr}) st,
                   -- The next iteration only has to perform something if an actually declared variable with expression
                   -- was updated.
                   Set.insert var next
@@ -81,12 +81,12 @@ recalculateState vars state =
         then state
         else (\(newSt, next) -> recalculateState next newSt) $ foldl recalculateDecl (state, Set.empty) toUpdate
 
--- TODO: Store computed values and update them when triggered by a dependency.
 data Declaration
   = UndeclaredDeclaration {declDependents :: Set Variable}
   | DeclaredDeclaration
       { declExpr :: Expression,
         declType :: Either T.Text Type,
+        declValue :: Maybe Value,
         declDependents :: Set Variable
       }
 
@@ -96,10 +96,16 @@ tryDeclExpr = \case
   DeclaredDeclaration {declExpr = e} -> Just e
   _ -> Nothing
 
--- | Attempts to get the type of a declaration. Returns None if no expression is declared.
-tryDecltype :: Declaration -> Maybe Type
-tryDecltype = \case
+-- | Attempts to get the type of a declaration. Returns None if no expression is declared or its type is not known.
+tryDeclType :: Declaration -> Maybe Type
+tryDeclType = \case
   DeclaredDeclaration {declType = t} -> rightToMaybe t
+  _ -> Nothing
+
+-- | Attempts to get the value of a declaration. Returns None if no expression is declared or its value is not known.
+tryDeclValue :: Declaration -> Maybe Value
+tryDeclValue = \case
+  DeclaredDeclaration {declValue = v} -> v
   _ -> Nothing
 
 -- | Registers a variable as a dependency with a declaration.
@@ -125,6 +131,7 @@ createDeclaration var state expr =
   DeclaredDeclaration
     { declExpr = expr,
       declType = expressionType state expr,
+      declValue = expressionValue state expr,
       declDependents = maybe Set.empty declDependents (Map.lookup var state)
     }
 
@@ -171,11 +178,49 @@ operatorTypeMap =
     ]
 
 variableType :: ExyState -> Variable -> Maybe Type
-variableType state var = tryDecltype =<< Map.lookup var state
+variableType state var = tryDeclType =<< Map.lookup var state
 
 primitiveType :: Primitive -> Type
 primitiveType (Number _) = TypeNumber
 primitiveType (Truth _) = TypeTruth
+
+-- Values
+
+data Value = NumberValue Integer | TruthValue Bool deriving (Eq, Ord)
+
+instance Show Value where
+  show (NumberValue n) = show n
+  show (TruthValue True) = "Yes"
+  show (TruthValue False) = "No"
+
+expressionValue :: ExyState -> Expression -> Maybe Value
+expressionValue _ (PrimitiveExpression p) = Just $ primitiveValue p
+expressionValue state (VariableReference v) = variableValue state v
+expressionValue state (GroupedExpression e) = expressionValue state e
+expressionValue state ex@(BinaryExpression op l r) =
+  case (expressionValue state l, expressionValue state r) of
+    (Just tl, Just tr) -> tryApplyOperator op tl tr
+    _ -> Nothing
+
+-- | Attempts to apply an operator to two types. This function implements the calculations for every operator and
+-- pair of values that is available.
+-- This function should implement the same cases as operatorTypeMap contains.
+-- TODO: Find a way to do this in a more type safe way?
+tryApplyOperator :: Operator -> Value -> Value -> Maybe Value
+tryApplyOperator Plus (NumberValue n1) (NumberValue n2) = Just $ NumberValue (n1 + n2)
+tryApplyOperator Minus (NumberValue n1) (NumberValue n2) = Just $ NumberValue (n1 - n2)
+tryApplyOperator Equals (NumberValue n1) (NumberValue n2) = Just $ TruthValue (n1 == n2)
+tryApplyOperator Equals (TruthValue t1) (TruthValue t2) = Just $ TruthValue (t1 == t2)
+tryApplyOperator Or (TruthValue t1) (TruthValue t2) = Just $ TruthValue (t1 || t2)
+tryApplyOperator And (TruthValue t1) (TruthValue t2) = Just $ TruthValue (t1 && t2)
+tryApplyOperator _ _ _ = Nothing
+
+variableValue :: ExyState -> Variable -> Maybe Value
+variableValue state var = tryDeclValue =<< Map.lookup var state
+
+primitiveValue :: Primitive -> Value
+primitiveValue (Number n) = NumberValue n
+primitiveValue (Truth t) = TruthValue t
 
 -- Primitive types
 
